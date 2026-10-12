@@ -55,8 +55,30 @@ the host/socket for the authoritative session.
 
 ## Actual-machine test record
 
+The owner's pre-install report on 2026-10-12 confirmed Nobara 44 with the
+target kernel, an existing build Makefile and matching recorded kernel release,
+and the installed matching `kernel-devel` package. Plasma Login Manager
+(`plasmalogin.service`) was active with a local seat0 KDE Wayland session.
+Secure Boot and SELinux were disabled. No conflicting streaming-host RPMs were
+installed. DKMS, G++, CMake and Ninja were absent. Firewalld was active;
+the VibeShine firewall service was absent before package installation.
+
+The machine exposes two AMD GPUs: Navi 21 at PCI `0000:03:00.0` and
+Raphael/Radeon 610M at `0000:13:00.0`. `vainfo` was unavailable, so hardware
+encoding remains unverified. To inspect the discrete GPU explicitly:
+
+```bash
+sudo dnf install libva-utils
+ls -l /dev/dri/by-path/
+vainfo --display drm --device /dev/dri/by-path/pci-0000:03:00.0-render
+```
+
+Retain the VAAPI profiles and entrypoints. An encoding entrypoint is a
+prerequisite; qualification still requires a real H.264 streaming session.
+
 Record the package version, running kernel, GPU/driver and results for each row.
-Every row below is pending until observed on the target machine.
+The installation and runtime rows below remain pending until observed on the
+target machine.
 
 | Test | Evidence to retain | Status |
 | --- | --- | --- |

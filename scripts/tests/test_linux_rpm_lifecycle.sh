@@ -19,6 +19,7 @@ transaction() {
   fi
 }
 transaction install "$package"
+# shellcheck source=/dev/null
 source "$installer"
 check_private_host_security
 # A container has no authoritative KDE desktop. Package setup must not activate
@@ -37,9 +38,9 @@ transaction reinstall "$package"
 check_private_host_security
 sha256sum -c /tmp/retention.sha256
 transaction remove vibeshine
-! rpm -q vibeshine
-! systemctl is-active --quiet vibeshine-session-controller.service
-! systemctl is-active --quiet vibeshine.service
+if rpm -q vibeshine; then exit 1; fi
+if systemctl is-active --quiet vibeshine-session-controller.service; then exit 1; fi
+if systemctl is-active --quiet vibeshine.service; then exit 1; fi
 sha256sum -c /tmp/retention.sha256
 [[ ! -e /usr/bin/vibeshine && ! -e /usr/libexec/vibeshine/vibeshine-host ]]
 transaction install "$package"
