@@ -55,8 +55,19 @@ the host/socket for the authoritative session.
 
 ## Actual-machine test record
 
+On 2026-10-12, fork revision `44723ec1` built successfully on the target
+Nobara machine with CUDA disabled and GCC 16.2.1. All 145 selected
+`fast|component` CTest cases passed, as did the build/distribution and both
+Fedora and Arch installer regression scripts. CPack produced
+`vibeshine-2.0.0~nobara.validation-1.x86_64`; the RPM inspector validated its
+306 payload entries, privileged metadata, assets, services, DKMS sources and
+lifecycle contracts. Package SHA-256:
+`fd3ba0e46b194a098c992d631b31879c88ad523b8326809e3fe0a29a89eca12d`.
+These are build/package results; installation and streaming remain separate
+qualification steps.
+
 After prerequisite installation, the updated installer preflight passed over
-SSH. The DRM module also compiled as an unprivileged user against the target
+SSH. Both DRM and DualSense modules compiled as an unprivileged user against the target
 kernel; `modinfo` reported the exact running-kernel vermagic. This was a direct
 module build, not DKMS registration, installation or loading. BTF generation
 was skipped because the development tree did not provide `vmlinux`.
