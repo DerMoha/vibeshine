@@ -32,6 +32,15 @@ vibeshine_unit_is_quiescent() {
   vibeshine_properties=$(timeout --signal=KILL 5 systemctl show "$1" \
     --property=LoadState --property=ActiveState --property=SubState --property=MainPID \
     --property=ControlGroup 2>/dev/null) || return 1
+  # Socket units have no MainPID property; their owning workers are checked
+  # separately and the socket cgroup must still be empty.
+  case "$1" in
+    *.socket)
+      if ! printf '%s\n' "$vibeshine_properties" | grep -q '^MainPID='; then
+        vibeshine_properties="$vibeshine_properties
+MainPID=0"
+      fi ;;
+  esac
   [ "$(printf '%s\n' "$vibeshine_properties" | wc -l | tr -d ' ')" = 5 ] || return 1
   for vibeshine_property in LoadState ActiveState SubState MainPID ControlGroup; do
     vibeshine_property_count=$(printf '%s\n' "$vibeshine_properties" | \
