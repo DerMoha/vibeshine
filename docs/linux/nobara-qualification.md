@@ -103,15 +103,15 @@ Retain the VAAPI profiles and entrypoints. An encoding entrypoint is a
 prerequisite; qualification still requires a real H.264 streaming session.
 
 Record the package version, running kernel, GPU/driver and results for each row.
-The installation and runtime rows below remain pending until observed on the
-target machine.
+The statuses below distinguish observed target-machine results from remaining
+interactive tests.
 
 | Test | Evidence to retain | Status |
 | --- | --- | --- |
-| Exact kernel-devel and DKMS build | Installer output, DKMS status, build logs on failure | Pending |
-| DRM module loads | Installed and loaded version match; no load errors | Pending |
-| Service/controller session binding | System service status and relevant journal excerpt | Pending |
-| HTTPS Web UI | Browser reaches `https://localhost:47990` | Pending |
+| Exact kernel-devel and DKMS build | Installer output, DKMS status, build logs on failure | Passed: both modules installed for target kernel |
+| DRM module loads | Installed and loaded version match; no load errors | Passed: installed/loaded version 2.0.0 |
+| Service/controller session binding | System service status and relevant journal excerpt | Passed: ready desktop session 2, host active/running |
+| HTTPS Web UI | Browser reaches `https://localhost:47990` | HTTP 200 verified; interactive login pending |
 | Moonlight pairing | PIN accepted; client reconnects | Pending |
 | Hardware H.264 | Host log identifies hardware encoder; real video stream | Pending |
 | Audio and input | Audible audio; keyboard/mouse/controller in session | Pending |
