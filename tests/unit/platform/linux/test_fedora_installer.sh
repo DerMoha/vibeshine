@@ -243,3 +243,20 @@ for hook in vibeshine-preinst.in vibeshine-postinst.in vibeshine-prerm.in; do
   )
 done
 printf 'Socket lifecycle checks preserve idle/cgroup requirements without MainPID.\n'
+(
+  eval "$(sed -n '/^vibeshine_activate_host_upgrade_fence() {$/,/^}$/p' "$repo/packaging/linux/vibeshine-preinst.in")"
+  timeout() { shift 2; "$@"; }
+  systemctl() {
+    [[ "$1" == daemon-reload ]] && return 0
+    if [[ "$*" == *--property=LoadState* ]]; then printf 'LoadState=%s\n' "$load";
+    else printf 'RefuseManualStart=%s\nKillMode=mixed\nSendSIGKILL=no\n' "$refuse"; fi
+  }
+  vibeshine_unit_is_quiescent() { ((idle)); }
+  vibeshine_upgrade_kill_mode=mixed; idle=1; refuse=yes
+  for load in not-found masked loaded; do vibeshine_activate_host_upgrade_fence; done
+  load=masked; idle=0
+  if (vibeshine_activate_host_upgrade_fence); then exit 1; fi
+  load=loaded; idle=1; refuse=no
+  if (vibeshine_activate_host_upgrade_fence); then exit 1; fi
+)
+printf 'First-install and interrupted-install fences retain idle and upgrade guards.\n'
