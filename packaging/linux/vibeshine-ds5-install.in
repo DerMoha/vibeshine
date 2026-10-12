@@ -72,7 +72,6 @@ dkms_installed_for() {
 
 install_with_dkms() {
   local kernel_release=$1
-  remove_obsolete_dkms_registrations || return 1
   if ! dkms_registered; then
     log "registering ${DKMS_NAME}/${MODULE_VERSION} with DKMS"
     dkms add -m "$DKMS_NAME" -v "$MODULE_VERSION" || return 1
@@ -147,6 +146,9 @@ install_module() {
   kernel_release=$(current_kernel_release) || return 1
   validate_source_tree || return 1
   if command -v dkms >/dev/null 2>&1; then
+    # Registration cleanup failures require recovery, not a direct-build
+    # fallback that leaves a broken DKMS database behind.
+    remove_obsolete_dkms_registrations || return 1
     if install_with_dkms "$kernel_release"; then
       load_module || return $?
       log "installed DualSense USB module with DKMS for ${kernel_release}"
