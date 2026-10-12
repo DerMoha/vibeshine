@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import subprocess
+import stat
 
 
 def rpm(package, *arguments):
@@ -17,8 +18,10 @@ def validate(package):
     records = rpm(package, "--qf",
                   "[%{FILENAMES}\\t%{FILEMODES}\\t%{FILEUSERNAME}\\t%{FILEGROUPNAME}\\t%{FILECAPS}\\n]")
     files = {}
+    file_types = {}
     for line in records.splitlines():
         path, mode, user, group, capabilities = line.split("\t")
+        file_types[path] = int(mode)
         files[path] = (int(mode) & 0o7777, user, group, capabilities)
     private = "/usr/libexec/vibeshine/"
     expected = {
@@ -28,6 +31,8 @@ def validate(package):
         private + "vibeshine-host": (0o750, "root", "vibeshine", "cap_sys_admin,cap_sys_nice=p"),
     }
     for path, metadata in expected.items():
+        if not stat.S_ISREG(file_types.get(path, 0)):
+            raise ValueError(f"Privileged executable must be a regular inode: {path}")
         if files.get(path) != metadata:
             raise ValueError(f"Incorrect privileged-file metadata for {path}: {files.get(path)}; expected {metadata}")
     for path, (_, user, _, capabilities) in files.items():
