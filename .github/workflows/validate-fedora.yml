@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Bootstrap
-        run: dnf install -y git python3 make findutils
+        run: dnf install -y git python3 make findutils diffutils
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
       - name: Installer and machine lifecycle regressions
         run: |

@@ -141,3 +141,42 @@ check_dkms_state
 status_text="vibeshine-drm/2.0.0, $kernel_release, x86_64: built"
 if (check_dkms_state); then exit 1; fi
 printf 'Fedora distribution, RPM upgrades/conflicts, kernel tree, session and DKMS checks passed.\n'
+
+# Every privileged inode must have exactly the shipped metadata. A failure to
+# inspect capabilities must fail even on the public capability-free executable.
+(
+  security_root="$fixture/security"
+  for name in usr/bin/vibeshine usr/libexec/vibeshine/vibeshine-session-exec \
+    usr/libexec/vibeshine/vibeshine-host usr/libexec/vibeshine/vibeshine-session-broker; do
+    mkdir -p "${security_root}/${name%/*}"
+    touch "$security_root/$name"; chmod 755 "$security_root/$name"
+  done
+  security_failure=''
+  stat() {
+    case "${!#}" in
+      */vibeshine-host) printf 'root:vibeshine:750:1' ;;
+      */vibeshine-session-broker) printf 'root:root:700:1' ;;
+      *) printf 'root:root:755:1' ;;
+    esac
+  }
+  getcap() {
+    case "$security_failure:${!#}" in
+      query:*) return 1 ;;
+      public:*/bin/vibeshine) printf '%s cap_sys_admin=p' "${!#}"; return ;;
+      host:*/vibeshine-host) return 0 ;;
+    esac
+    case "${!#}" in
+      */vibeshine-host) printf '%s cap_sys_admin,cap_sys_nice=p' "${!#}" ;;
+      */vibeshine-session-broker) printf '%s cap_kill,cap_setgid,cap_setuid=p' "${!#}" ;;
+    esac
+    return 0
+  }
+  check_private_host_security "$security_root"
+  for security_failure in query public host; do
+    if (check_private_host_security "$security_root"); then exit 1; fi
+  done
+  security_failure=''
+  rm "$security_root/usr/libexec/vibeshine/vibeshine-host"
+  if (check_private_host_security "$security_root"); then exit 1; fi
+)
+printf 'Privileged-file regression checks passed.\n'
