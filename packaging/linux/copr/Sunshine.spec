@@ -1,3 +1,5 @@
+%bcond_without cuda
+
 %global build_timestamp %(date +"%Y%m%d")
 
 # use sed to replace these values
@@ -60,7 +62,7 @@ BuildRequires: appstream
 BuildRequires: glslc
 BuildRequires: libappstream-glib
 BuildRequires: vulkan-loader-devel
-BuildRequires: libayatana-appindicator3-devel
+BuildRequires: libayatana-appindicator-gtk3-devel
 BuildRequires: libgudev
 BuildRequires: mesa-libGL-devel
 BuildRequires: mesa-libgbm-devel
@@ -71,6 +73,12 @@ BuildRequires: pulseaudio-libs-devel
 BuildRequires: python3-jinja2
 BuildRequires: python3-setuptools
 BuildRequires: systemd-udev
+BuildRequires: systemd-devel
+BuildRequires: wayland-devel
+BuildRequires: wayland-protocols-devel
+BuildRequires: sqlite-devel
+BuildRequires: nodejs
+BuildRequires: npm
 %{?sysusers_requires_compat}
 %endif
 
@@ -98,6 +106,7 @@ BuildRequires: vulkan-devel
 %endif
 %endif
 
+%if %{with cuda}
 # Conditional BuildRequires for cuda-gcc based on distribution version
 %if 0%{?fedora}
 %if 0%{?fedora} <= 41
@@ -139,7 +148,15 @@ BuildRequires: gcc14-c++
 %endif
 %endif
 
+%else
+BuildRequires: gcc
+BuildRequires: gcc-c++
+%endif
+
 %global cuda_dir %{_builddir}/cuda
+
+Requires(pre): /usr/bin/systemd-sysusers
+Conflicts: sunshine, apollo, vibepollo
 
 # Common runtime requirements
 Requires: miniupnpc >= 2.2.4
@@ -161,7 +178,7 @@ Recommends: make
 %if 0%{?fedora}
 # Fedora runtime requirements
 Requires: python3 >= 3.9
-Requires: libayatana-appindicator3 >= 0.5.3
+Requires: libayatana-appindicator-gtk3 >= 0.5.3
 Requires: libcap >= 2.22
 Requires: libcurl >= 7.0
 Requires: libdrm > 2.4.97
@@ -242,6 +259,7 @@ cmake_args=(
   "-DSUNSHINE_PUBLISHER_ISSUE_URL=https://github.com/Nonary/vibeshine/issues"
 )
 
+%if %{with cuda}
 export CC=gcc-%{gcc_version}
 export CXX=g++-%{gcc_version}
 
@@ -312,6 +330,12 @@ else
   cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF")
 fi
 
+%else
+export CC=gcc
+export CXX=g++
+cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF" "-DSUNSHINE_REQUIRE_CUDA_PASCAL=OFF")
+%endif
+
 # setup the version
 export BRANCH=%{branch}
 export BUILD_VERSION=%{build_semver}
@@ -341,6 +365,11 @@ cd %{_builddir}/Sunshine/build
 
 %pre
 export LC_ALL=C
+# RPM must resolve this group before unpacking the private host inode.
+# Keep the policy identical to packaging/linux/vibeshine.sysusers.
+systemd-sysusers --inline \
+  'u vibeshine - "Vibeshine machine host" /var/lib/vibeshine /usr/bin/nologin' \
+  'g vibeshine-uinput - -' || exit 1
 vibeshine_controller=%{_prefix}/libexec/vibeshine/vibeshine-session-controller
 vibeshine_legacy_host=%{_prefix}/libexec/vibeshine/vibeshine-machine-host
 vibeshine_legacy_handoff=%{_prefix}/libexec/vibeshine/vibeshine-session-handoff
