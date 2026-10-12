@@ -75,7 +75,7 @@ vibeshine_restore_template_is_masked() {
   vibeshine_restore_mask=$(timeout --signal=KILL 5 systemctl is-enabled \
     'vibeshine-session-restore@.service' 2>/dev/null || true)
   vibeshine_restore_load=$(timeout --signal=KILL 5 systemctl show \
-    'vibeshine-session-restore@.service' --property=LoadState 2>/dev/null) || return 1
+    'vibeshine-session-restore@vibeshine-mask-check.service' --property=LoadState 2>/dev/null) || return 1
   case "$vibeshine_restore_mask" in
     masked | masked-runtime) [ "$vibeshine_restore_load" = 'LoadState=masked' ] ;;
     *) return 1 ;;
