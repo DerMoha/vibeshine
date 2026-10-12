@@ -55,6 +55,17 @@ the host/socket for the authoritative session.
 
 ## Actual-machine test record
 
+After prerequisite installation, the updated installer preflight passed over
+SSH. The DRM module also compiled as an unprivileged user against the target
+kernel; `modinfo` reported the exact running-kernel vermagic. This was a direct
+module build, not DKMS registration, installation or loading. BTF generation
+was skipped because the development tree did not provide `vmlinux`.
+
+Nobara's prepared development tree reports only `7.2.9` from
+`make kernelrelease`. Its `include/config/kernel.release` and generated
+`UTS_RELEASE` both contain the full target release; the installer requires both
+prepared values to match the running kernel.
+
 The owner's pre-install report on 2026-10-12 confirmed Nobara 44 with the
 target kernel, an existing build Makefile and matching recorded kernel release,
 and the installed matching `kernel-devel` package. Plasma Login Manager
