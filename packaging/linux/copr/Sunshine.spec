@@ -404,6 +404,15 @@ vibeshine_unit_is_quiescent() {
   vibeshine_properties=$(timeout --signal=KILL 5 systemctl show "$1" \
     --property=LoadState --property=ActiveState --property=SubState --property=MainPID \
     --property=ControlGroup 2>/dev/null) || return 1
+  # Socket units have no MainPID property; their owning workers are checked
+  # separately and the socket cgroup must still be empty.
+  case "$1" in
+    *.socket)
+      if ! printf '%%s\n' "$vibeshine_properties" | grep -q '^MainPID='; then
+        vibeshine_properties="$vibeshine_properties
+MainPID=0"
+      fi ;;
+  esac
   [ "$(printf '%%s\n' "$vibeshine_properties" | wc -l | tr -d ' ')" = 5 ] || return 1
   for vibeshine_property in LoadState ActiveState SubState MainPID ControlGroup; do
     vibeshine_property_count=$(printf '%%s\n' "$vibeshine_properties" | \
@@ -444,7 +453,7 @@ vibeshine_restore_template_is_masked() {
   vibeshine_restore_mask=$(timeout --signal=KILL 5 systemctl is-enabled \
     'vibeshine-session-restore@.service' 2>/dev/null || true)
   vibeshine_restore_load=$(timeout --signal=KILL 5 systemctl show \
-    'vibeshine-session-restore@.service' --property=LoadState 2>/dev/null) || return 1
+    'vibeshine-session-restore@vibeshine-mask-check.service' --property=LoadState 2>/dev/null) || return 1
   case "$vibeshine_restore_mask" in
     masked | masked-runtime) [ "$vibeshine_restore_load" = 'LoadState=masked' ] ;;
     *) return 1 ;;
@@ -718,7 +727,12 @@ vibeshine_prepare_host_upgrade_fence() (
   if [ -e "$vibeshine_host_upgrade_dropin" ]; then
     [ "$(stat -c '%%u:%%g:%%a:%%h:%%F' -- "$vibeshine_host_upgrade_dropin")" = \
       '0:0:644:1:regular file' ] || exit 1
-    cmp -s -- "$vibeshine_upgrade_temporary" "$vibeshine_host_upgrade_dropin" || exit 1
+    if ! cmp -s -- "$vibeshine_upgrade_temporary" "$vibeshine_host_upgrade_dropin"; then
+      # A failed first install can leave the pre-payload fence behind. Once
+      # the host is proven idle, replace that validated root-owned fence with
+      # the installed supervisor's signal contract.
+      vibeshine_unit_is_quiescent vibeshine.service || exit 1
+    fi
   fi
   install -o root -g root -m 0644 -- "$vibeshine_upgrade_temporary" \
     "$vibeshine_host_upgrade_dropin" || exit 1
@@ -727,6 +741,15 @@ vibeshine_prepare_host_upgrade_fence() (
 )
 vibeshine_activate_host_upgrade_fence() {
   systemctl daemon-reload || exit 1
+  # A drop-in cannot create a missing service on first installation. There is
+  # no old host to fence; still require its exact unit and cgroup to be idle.
+  vibeshine_host_load=$(timeout --signal=KILL 5 systemctl show vibeshine.service \
+    --property=LoadState 2>/dev/null) || exit 1
+  case "$vibeshine_host_load" in
+    LoadState=not-found | LoadState=masked)
+      vibeshine_unit_is_quiescent vibeshine.service || exit 1
+      return 0 ;;
+  esac
   vibeshine_host_stop_properties=$(timeout --signal=KILL 5 systemctl show vibeshine.service \
     --property=RefuseManualStart --property=KillMode --property=SendSIGKILL 2>/dev/null) || exit 1
   printf '%%s\n' "$vibeshine_host_stop_properties" | grep -qx 'RefuseManualStart=yes' || exit 1
@@ -1137,6 +1160,15 @@ vibeshine_unit_is_quiescent() {
   vibeshine_properties=$(timeout --signal=KILL 5 systemctl show "$1" \
     --property=LoadState --property=ActiveState --property=SubState --property=MainPID \
     --property=ControlGroup 2>/dev/null) || return 1
+  # Socket units have no MainPID property; their owning workers are checked
+  # separately and the socket cgroup must still be empty.
+  case "$1" in
+    *.socket)
+      if ! printf '%%s\n' "$vibeshine_properties" | grep -q '^MainPID='; then
+        vibeshine_properties="$vibeshine_properties
+MainPID=0"
+      fi ;;
+  esac
   [ "$(printf '%%s\n' "$vibeshine_properties" | wc -l | tr -d ' ')" = 5 ] || return 1
   for vibeshine_property in LoadState ActiveState SubState MainPID ControlGroup; do
     vibeshine_property_count=$(printf '%%s\n' "$vibeshine_properties" | \
