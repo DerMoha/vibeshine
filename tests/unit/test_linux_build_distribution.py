@@ -12,6 +12,19 @@ COMPILERS = "select_compilers() {" + BUILD.split("select_compilers() {", 1)[1].s
 
 
 class BuildDistributionTests(unittest.TestCase):
+    def test_step_argument_forms(self):
+        for arguments in (("--step", "deps"), ("--step=deps",)):
+            result = subprocess.run(["bash", "-c", FUNCTIONS + '\nprintf "selected=%s\\n" "$step"',
+                                     "build-test", *arguments], cwd=ROOT,
+                                    text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected=deps", result.stdout)
+        for arguments in (("--step",), ("--step", "--skip-cuda")):
+            result = subprocess.run(["bash", "-c", FUNCTIONS, "build-test", *arguments],
+                                    cwd=ROOT, text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--step requires a value", result.stderr)
+
     def shell(self, code, environment=None):
         return subprocess.run(["bash", "-c", code], cwd=ROOT,
                               env=dict(os.environ, **(environment or {})),

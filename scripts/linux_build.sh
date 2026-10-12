@@ -244,6 +244,14 @@ while getopts ":hs-:" opt; do
         step=*)
           step="${OPTARG#*=}"
           ;;
+        step)
+          if [[ ${!OPTIND:-} == "" || ${!OPTIND} == -* ]]; then
+            echo '--step requires a value' >&2
+            _usage 1
+          fi
+          step="${!OPTIND}"
+          OPTIND=$((OPTIND + 1))
+          ;;
         *)
           echo "Invalid option: --${OPTARG}" 1>&2
           _usage 1
