@@ -57,6 +57,7 @@ BuildRequires: which
 
 %if 0%{?fedora}
 # Fedora-specific BuildRequires
+BuildRequires: libstdc++-static
 BuildRequires: appstream
 # BuildRequires: boost-devel >= 1.86.0
 BuildRequires: glslc

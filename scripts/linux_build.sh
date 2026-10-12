@@ -414,6 +414,7 @@ function add_fedora_deps() {
     "${DOXYGEN}"
     "gcc"
     "gcc-c++"
+    "libstdc++-static"
     "make"
     "pkgconf-pkg-config"
     "systemd-devel"
