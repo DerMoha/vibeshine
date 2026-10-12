@@ -371,6 +371,7 @@ endif()
 # drivers, and assets together.
 set(CPACK_DEB_COMPONENT_INSTALL OFF)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
+            acl, \
             ${CPACK_DEB_PLATFORM_PACKAGE_DEPENDS} \
             debianutils, \
             libcap2, \
@@ -401,6 +402,7 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             x11-utils")
 set(CPACK_RPM_PACKAGE_REQUIRES "\
             ${CPACK_RPM_PLATFORM_PACKAGE_REQUIRES} \
+            /usr/bin/setfacl, \
             /usr/bin/pactl, \
             /usr/bin/parec, \
             /usr/bin/python3, \

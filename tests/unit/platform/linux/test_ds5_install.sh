@@ -54,3 +54,20 @@ expect_status 1 install_module
 rm "$SYS_MODULE_ROOT/$MODULE_NAME/srcversion"
 expect_status 1 module_status
 printf 'DualSense install: missing sources, DKMS/direct failures, load failures, and stale modules covered.\n'
+
+# Remove only exact obsolete registrations before installing the new module.
+MODULE_VERSION=2.0.1
+status_output=$'vibeshine-ds5/2.0.0, test-kernel, x86_64: installed\nvibeshine-ds5/2.0.0: broken\nvibeshine-ds5/2.0.1, test-kernel, x86_64: installed\nunrelated/1.0: installed'
+remove_result=0
+calls="$work/dkms-removals"
+dkms() {
+  if [[ "$1" == status ]]; then printf '%s\n' "$status_output";
+  else printf '%s\n' "$*" >> "$calls"; return "$remove_result"; fi
+}
+expect_status 0 remove_obsolete_dkms_registrations
+[[ $(< "$calls") == 'remove -m vibeshine-ds5 -v 2.0.0 --all' ]]
+remove_result=1
+expect_status 1 remove_obsolete_dkms_registrations
+status_output='vibeshine-ds5/../../unsafe: broken'
+expect_status 1 remove_obsolete_dkms_registrations
+printf 'DualSense obsolete registration cleanup is exact, deduplicated and fails closed.\n'

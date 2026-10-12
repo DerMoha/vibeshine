@@ -170,6 +170,7 @@ Requires: jq
 Requires: /usr/bin/pactl
 Requires: /usr/bin/parec
 Requires: /usr/bin/python3
+Requires: /usr/bin/setfacl
 Requires: /usr/bin/wayland-info
 Requires: /usr/bin/xdpyinfo
 Requires: socat
@@ -1346,6 +1347,7 @@ done
 # Load uhid (DS5 emulation)
 echo "Loading uhid kernel module for DS5 emulation."
 modprobe uhid
+modprobe uinput || echo 'warning: could not load uinput; verify native input access before use.' >&2
 
 # Check if we're in an rpm-ostree environment
 if [ ! -x "$(command -v rpm-ostree)" ]; then
@@ -1417,6 +1419,12 @@ if [ ! -x "$(command -v rpm-ostree)" ]; then
     $path_to_udevadm control --reload-rules
     $path_to_udevadm trigger --property-match=DEVNAME=/dev/uinput
     $path_to_udevadm trigger --property-match=DEVNAME=/dev/uhid
+    $path_to_udevadm settle --timeout=10 || exit 1
+    for device in /dev/uinput /dev/uhid; do
+      [ -c "$device" ] || continue
+      [ ! -L "$device" ] && [ "$(stat -c '%%u:%%G' "$device")" = '0:vibeshine-uinput' ] || exit 1
+      setfacl -m g::rw "$device" || exit 1
+    done
     echo "Udev rules reloaded successfully."
   else
     echo "error: udevadm not found or not executable."
