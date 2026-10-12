@@ -22,8 +22,10 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           submodules: false
+          fetch-depth: 0
       - name: Initialize Linux dependencies
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git -c safe.directory="$GITHUB_WORKSPACE" submodule update --init --recursive --depth 1 -- \
             third-party/build-deps third-party/Simple-Web-Server third-party/moonlight-common-c \
             third-party/libdisplaydevice third-party/libvirtualdisplay third-party/libvirtualgamepad \
@@ -35,6 +37,7 @@ jobs:
       - name: Build native RPM without CUDA
         env:
           BUILD_JOBS: '2'
+          BUILD_VERSION: 2.0.0-fedora.validation
         run: bash scripts/linux_build.sh --sudo-off --skip-cuda
       - name: Inspect package
         run: python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
