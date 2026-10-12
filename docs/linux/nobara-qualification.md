@@ -119,7 +119,7 @@ interactive tests.
 | Service restart | Warn viewer, restart controller, reconnect, inspect recovery | Passed: stopped test stream, restarted controller, paired client reconnected |
 | Reboot | Driver/controller recover; paired client reconnects | Passed: new boot ID, both services active, paired Mac reconnects with H.264 video and KRunner keyboard input |
 | Upgrade | Install a higher native version; configuration/pairings retained | Passed: 2.0.0 to 2.0.1; configuration and pairing files retained; paired client reconnects after reboot |
-| Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Pending |
+| Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Passed on Nobara: normal DNF removal, native installer reinstall, configuration/pairing checksums retained, paired Mac streams again |
 
 Subsequent target-machine installation found and corrected first-install and
 interrupted-install systemd hook assumptions (absent service fences, template
@@ -168,3 +168,12 @@ stream without pairing again; Alt+F2 opened KRunner through streamed input.
 Hosted Fedora RPM build and booted package lifecycle workflows also passed.
 The hosted lifecycle check does not substitute for native removal/reinstall
 or audible audio and physical controller testing.
+
+Native removal/reinstall also passed on the target. DNF removed only Vibeshine;
+configuration, apps, machine profile and pairing state matched saved SHA-256
+checksums both after removal and after reinstall. Both DKMS modules were
+installed again, the controller recovered the host, HTTPS returned 200 and
+the already paired Mac opened a Desktop video stream without a new PIN.
+The DKMS log warned that Nobara lacks `/usr/sbin/weak-modules`; exact running
+kernel installation nevertheless succeeded. Future-kernel coverage remains
+dependent on the normal DKMS kernel-update path.
