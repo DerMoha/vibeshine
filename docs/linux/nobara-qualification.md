@@ -64,8 +64,12 @@ installed. DKMS, G++, CMake and Ninja were absent. Firewalld was active;
 the VibeShine firewall service was absent before package installation.
 
 The machine exposes two AMD GPUs: Navi 21 at PCI `0000:03:00.0` and
-Raphael/Radeon 610M at `0000:13:00.0`. `vainfo` was unavailable, so hardware
-encoding remains unverified. To inspect the discrete GPU explicitly:
+Raphael/Radeon 610M at `0000:13:00.0`. A subsequent SSH check identified the
+discrete GPU as an RX 6900 XT with Mesa 26.2.4. `vainfo` reported H.264
+Constrained Baseline, Main and High encoding entrypoints. FFmpeg successfully
+encoded 60 synthetic 1280x720 frames with `h264_vaapi` on that render device.
+This confirms basic hardware encoding, while VibeShine capture and streaming
+remain pending. To inspect the discrete GPU explicitly:
 
 ```bash
 sudo dnf install libva-utils
