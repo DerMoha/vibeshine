@@ -227,3 +227,19 @@ printf 'Privileged-file regression checks passed.\n'
   [[ ! -e "$trace" ]]
 )
 printf 'Pending enrollment cannot report completed installation.\n'
+
+# Real systemd socket units omit MainPID; retain all other idle/cgroup checks.
+for hook in vibeshine-preinst.in vibeshine-postinst.in vibeshine-prerm.in; do
+  (
+    eval "$(sed -n '/^vibeshine_unit_is_quiescent() {$/,/^}$/p' "$repo/packaging/linux/$hook")"
+    timeout() { shift 2; "$@"; }
+    systemctl() { printf 'LoadState=masked\nActiveState=%s\nSubState=%s\nControlGroup=\n' "$state" "$substate"; }
+    vibeshine_cgroup_is_quiescent() { [[ -z "$1" ]]; }
+    state=inactive; substate=dead
+    vibeshine_unit_is_quiescent vibeshine-session-exec.socket
+    if vibeshine_unit_is_quiescent vibeshine.service; then exit 1; fi
+    state=active; substate=listening
+    if vibeshine_unit_is_quiescent vibeshine-session-exec.socket; then exit 1; fi
+  )
+done
+printf 'Socket lifecycle checks preserve idle/cgroup requirements without MainPID.\n'
