@@ -9,6 +9,9 @@ on:
       - 'cmake/packaging/linux.cmake'
       - 'packaging/linux/**'
       - '.github/workflows/validate-fedora.yml'
+concurrency:
+  group: fedora-rpm-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -40,8 +43,12 @@ jobs:
         env:
           BUILD_VERSION: 2.0.0-fedora.validation
         run: bash scripts/linux_build.sh --sudo-off --skip-cuda
+      - name: Linux regression tests
+        run: ctest --test-dir build --output-on-failure -L 'fast|component' --timeout 60 -j 2
       - name: Inspect package
         run: python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
+      - name: Resolve RPM runtime dependencies without installation
+        run: dnf install -y --downloadonly build/cpack_artifacts/*.rpm
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: fedora44-rpm
