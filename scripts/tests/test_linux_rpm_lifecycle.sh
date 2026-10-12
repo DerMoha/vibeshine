@@ -18,7 +18,7 @@ transaction() {
     exit 1
   fi
 }
-transaction install "$package"
+transaction replay /var/tmp/vibeshine-install
 # shellcheck source=/dev/null
 source "$installer"
 check_private_host_security

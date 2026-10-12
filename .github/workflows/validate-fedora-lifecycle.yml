@@ -56,7 +56,7 @@ jobs:
           # Resolve/download all signed repository dependencies in Docker's
           # working network before testing hooks in the booted nspawn root.
           docker run --name vibeshine-fedora-root --volume="$PWD/packages:/packages:ro" fedora:44 \
-            bash -c 'dnf install -y systemd systemd-udev dbus-daemon procps-ng && systemctl enable dbus.socket && dnf install --downloadonly -y /packages/*.rpm'
+            bash -c 'dnf install -y systemd systemd-udev dbus-daemon procps-ng && systemctl enable dbus.socket && dnf install --store=/var/tmp/vibeshine-install -y /packages/*.rpm'
           mkdir rootfs
           docker export vibeshine-fedora-root | sudo tar -xpf - -C rootfs
           docker rm vibeshine-fedora-root
