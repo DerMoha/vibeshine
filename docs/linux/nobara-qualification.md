@@ -121,6 +121,19 @@ target machine.
 | Upgrade | Install a higher native version; configuration/pairings retained | Pending |
 | Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Pending |
 
+Subsequent target-machine installation found and corrected first-install and
+interrupted-install systemd hook assumptions (absent service fences, template
+queries, socket units without `MainPID`). Revision `d1d37523` was rebuilt and
+installed through DNF after recovery. Both DKMS modules report installed for
+the exact target kernel and appear in `lsmod`. The controller and host reach
+active/running, and the local HTTPS UI returns 200. The host discovers
+`h264_vaapi` and `hevc_vaapi`; AV1 encoding is unavailable on this GPU.
+The same 145 CTest cases passed after the KMS routing fix. Privileged ownership,
+mode, link count and file capabilities were checked on the installed payload;
+the active firewalld zone allows the packaged service after definition reload.
+Moonlight 6.2.0 was installed on the owner's Mac and reached the pairing PIN
+dialog; completed pairing and streaming are still pending.
+
 For logs, use `sudo journalctl -u vibeshine-session-controller.service
 -u vibeshine.service -b --no-pager`. Review logs before sharing. A reachable Web
 UI or active system unit alone does not prove encoder, audio, input or display
