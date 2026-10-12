@@ -72,6 +72,7 @@ dkms_installed_for() {
 
 install_with_dkms() {
   local kernel_release=$1
+  remove_obsolete_dkms_registrations || return 1
   if ! dkms_registered; then
     log "registering ${DKMS_NAME}/${MODULE_VERSION} with DKMS"
     dkms add -m "$DKMS_NAME" -v "$MODULE_VERSION" || return 1
@@ -80,6 +81,23 @@ install_with_dkms() {
   dkms build -m "$DKMS_NAME" -v "$MODULE_VERSION" -k "$kernel_release" --force || return 1
   dkms install -m "$DKMS_NAME" -v "$MODULE_VERSION" -k "$kernel_release" --force || return 1
   dkms_installed_for "$kernel_release"
+}
+
+remove_obsolete_dkms_registrations() {
+  local output line version seen=' '
+  output=$(dkms status -m "$DKMS_NAME" 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    [[ "$line" == "$DKMS_NAME/"* ]] || continue
+    version=${line#"$DKMS_NAME"/}
+    version=${version%%,*}; version=${version%%:*}
+    [[ -n "$version" && "$version" != *[!A-Za-z0-9._+-]* ]] || {
+      error 'refusing unsafe obsolete DKMS version'; return 1;
+    }
+    [[ "$version" == "$MODULE_VERSION" || "$seen" == *" $version "* ]] && continue
+    seen+="$version "
+    log "removing obsolete ${DKMS_NAME}/${version} registration"
+    dkms remove -m "$DKMS_NAME" -v "$version" --all || return 1
+  done <<< "$output"
 }
 
 install_direct() {
