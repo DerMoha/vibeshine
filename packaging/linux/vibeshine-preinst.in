@@ -282,7 +282,12 @@ vibeshine_prepare_host_upgrade_fence() (
   if [ -e "$vibeshine_host_upgrade_dropin" ]; then
     [ "$(stat -c '%u:%g:%a:%h:%F' -- "$vibeshine_host_upgrade_dropin")" = \
       '0:0:644:1:regular file' ] || exit 1
-    cmp -s -- "$vibeshine_upgrade_temporary" "$vibeshine_host_upgrade_dropin" || exit 1
+    if ! cmp -s -- "$vibeshine_upgrade_temporary" "$vibeshine_host_upgrade_dropin"; then
+      # A failed first install can leave the pre-payload fence behind. Once
+      # the host is proven idle, replace that validated root-owned fence with
+      # the installed supervisor's signal contract.
+      vibeshine_unit_is_quiescent vibeshine.service || exit 1
+    fi
   fi
   install -o root -g root -m 0644 -- "$vibeshine_upgrade_temporary" \
     "$vibeshine_host_upgrade_dropin" || exit 1
