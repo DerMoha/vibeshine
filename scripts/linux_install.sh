@@ -159,7 +159,7 @@ install_rpm_kernel_headers() {
 }
 
 validate_rpm_package() {
-  local identity conflict installed_epoch candidate_epoch comparison
+  local identity conflict installed_epoch candidate_epoch comparison payload path mode owner
   [[ -n "$local_package" && -f "$local_package" ]] ||
     die 'Fedora/Nobara requires --package /absolute/path/vibeshine.rpm from a trusted native build; no RPM release repository is configured.'
   identity=$(rpm -qp --qf '%{NAME} %{ARCH}' -- "$local_package") || die 'cannot inspect RPM'
@@ -181,6 +181,23 @@ validate_rpm_package() {
       die "$conflict is installed. Back up its configuration and pairings and explicitly resolve the conflict before retrying; no packages were removed."
     fi
   done
+  for path in /usr/bin/sunshine /usr/bin/apollo /usr/local/bin/sunshine /usr/local/bin/apollo /usr/local/bin/vibeshine; do
+    if [[ -e "$path" || -L "$path" ]]; then
+      owner=$(rpm -qf --qf '%{NAME}' -- "$path" 2>/dev/null) || owner='unowned manual installation'
+      [[ "$owner" == vibeshine ]] || die "Conflicting host executable $path ($owner). Back up its settings and resolve the existing installation explicitly."
+    fi
+  done
+  payload=$(rpm -qp --qf '[%{FILENAMES}\t%{FILEMODES}\n]' -- "$local_package") || die 'cannot inspect RPM payload'
+  while IFS=$'\t' read -r path mode; do
+    [[ "$path" == /* && "$mode" =~ ^[0-9]+$ ]] || die 'invalid RPM payload metadata'
+    (( (mode & 0170000) == 0100000 )) || continue
+    if [[ -e "$path" || -L "$path" ]]; then
+      owner=$(rpm -qf --qf '%{NAME}' -- "$path" 2>/dev/null) ||
+        die "Unowned existing file $path would be replaced. Back it up and resolve the manual installation explicitly before retrying."
+      [[ "$owner" == vibeshine ]] || die "Existing file $path belongs to $owner; resolve the package conflict explicitly."
+    fi
+  done <<< "$payload"
+
 }
 
 install_rpm_package() {
@@ -696,6 +713,7 @@ open_firewall() {
 }
 
 reboot_required=0
+enrollment_pending=0
 
 install_virtual_driver() {
   local helper=${1:-$DRM_INSTALL} result=0 installed
@@ -711,7 +729,7 @@ install_virtual_driver() {
   case "$result" in
     0) ;;
     4) reboot_required=1; warn 'The virtual-display driver is installed; reboot to use the updated module.' ;;
-    5) reboot_required=1; warn 'The virtual-display driver is installed; reboot and approve its pending Secure Boot key enrollment.' ;;
+    5) reboot_required=1; enrollment_pending=1; warn 'The virtual-display driver is installed; reboot and approve its pending Secure Boot key enrollment.' ;;
     *) die "virtual-display driver installation failed for ${kernel_release} (status $result). See the driver error above; installation is not complete." ;;
   esac
   installed=$(modinfo -k "$kernel_release" -F version vibeshine_drm 2>/dev/null) && [[ -n "$installed" ]] ||
@@ -897,6 +915,9 @@ main() {
   install_vibeshine
   check_private_host_security
   install_virtual_driver
+  if [[ "$package_manager" == dnf && "$enrollment_pending" == 1 ]]; then
+    die 'Module-signing authorization is pending. Reboot, approve MOK enrollment, then rerun this installer with the same RPM. Installation is not complete until the modules load.'
+  fi
   install_dualsense_driver
   if [[ "$package_manager" == dnf ]]; then check_dkms_state; fi
   repair_machine_setup || die 'machine setup recovery failed; installation is not complete'

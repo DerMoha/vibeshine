@@ -9,12 +9,14 @@ source "$repo/scripts/linux_install.sh"
 trap 'rm -rf "$fixture"' EXIT
 calls="$fixture/calls"
 fixture_identity='vibeshine x86_64'
+fixture_payload=$'/nonexistent-vibeshine-fixture\t33261'
 conflicting=0; installed_version=''; candidate_version='0:2.0.0-1'; fixture_comparison=1
 package_result=0; create_headers=0
 rpm() {
   case "$1" in
     -qp)
-      if [[ "$*" == *EPOCHNUM* ]]; then printf '%s' "$candidate_version";
+      if [[ "$*" == *FILENAMES* ]]; then printf '%s' "$fixture_payload";
+      elif [[ "$*" == *EPOCHNUM* ]]; then printf '%s' "$candidate_version";
       else printf '%s' "$fixture_identity"; fi ;;
     --eval) printf '%s' "$fixture_comparison" ;;
     -q)
@@ -76,6 +78,12 @@ rm "$calls"
 package_result=1
 if (install_rpm_package); then exit 1; fi
 package_result=0; installed_version=''; rm "$calls"
+
+touch "$fixture/unowned"
+fixture_payload="$fixture/unowned"$'\t33261'
+if (install_rpm_package); then exit 1; fi
+[[ ! -e "$calls" ]]
+fixture_payload=$'/nonexistent-vibeshine-fixture\t33261'
 
 # Never substitute a different kernel's development tree.
 kernel_release=7.2.9-200.nobara.fc44.x86_64
@@ -180,3 +188,21 @@ printf 'Fedora distribution, RPM upgrades/conflicts, kernel tree, session and DK
   if (check_private_host_security "$security_root"); then exit 1; fi
 )
 printf 'Privileged-file regression checks passed.\n'
+
+# A pending MOK enrollment must not proceed to driver loading or setup, and
+# must not emit the normal installation-complete summary.
+(
+  trace="$fixture/enrollment-trace"
+  parse_args() { :; }; require_root() { :; }; run_checks() { :; }
+  select_package_manager() { package_manager=dnf; }
+  validate_rpm_package() { :; }; dnf() { :; }; dkms() { :; }
+  install_kernel_headers() { :; }; check_session_restart() { :; }
+  install_vibeshine() { :; }; check_private_host_security() { :; }
+  install_virtual_driver() { enrollment_pending=1; }
+  install_dualsense_driver() { printf 'ds5\n' >> "$trace"; }
+  repair_machine_setup() { printf 'setup\n' >> "$trace"; }
+  print_summary() { printf 'summary\n' >> "$trace"; }
+  if (main); then exit 1; fi
+  [[ ! -e "$trace" ]]
+)
+printf 'Pending enrollment cannot report completed installation.\n'

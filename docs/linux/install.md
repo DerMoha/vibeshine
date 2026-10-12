@@ -272,7 +272,7 @@ sudo bash scripts/linux_install.sh --package /absolute/path/vibeshine.rpm
 Use a trusted locally built RPM. There is no configured Fedora release
 repository; the installer requires an explicit package. DNF resolves dependencies
 and upgrades without automatic conflict erasure or a full distribution upgrade.
-Sunshine/Apollo conflicts require explicit administrator resolution and a backup
+Sunshine/Apollo conflicts and unowned manual installation files require explicit administrator resolution and a backup
 of their configuration/pairings. Existing VibeShine machine policy and state are
 preserved by the package lifecycle hooks.
 
