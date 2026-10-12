@@ -83,10 +83,13 @@ install_with_dkms() {
 }
 
 remove_obsolete_dkms_registrations() {
-  local output line version seen=' '
+  local kernel_release=$1 output line version seen=' '
   output=$(dkms status -m "$DKMS_NAME" 2>/dev/null) || return 1
   while IFS= read -r line; do
     [[ "$line" == "$DKMS_NAME/"* ]] || continue
+    # Keep registrations for other kernels and incomplete/broken records.
+    # DKMS replacement is already installed before retiring this kernel's copy.
+    [[ "$line" == *", $kernel_release, "* ]] || continue
     version=${line#"$DKMS_NAME"/}
     version=${version%%,*}; version=${version%%:*}
     [[ -n "$version" && "$version" != *[!A-Za-z0-9._+-]* ]] || {
@@ -95,7 +98,7 @@ remove_obsolete_dkms_registrations() {
     [[ "$version" == "$MODULE_VERSION" || "$seen" == *" $version "* ]] && continue
     seen+="$version "
     log "removing obsolete ${DKMS_NAME}/${version} registration"
-    dkms remove -m "$DKMS_NAME" -v "$version" --all || return 1
+    dkms remove -m "$DKMS_NAME" -v "$version" -k "$kernel_release" || return 1
   done <<< "$output"
 }
 
@@ -146,10 +149,10 @@ install_module() {
   kernel_release=$(current_kernel_release) || return 1
   validate_source_tree || return 1
   if command -v dkms >/dev/null 2>&1; then
-    # Registration cleanup failures require recovery, not a direct-build
-    # fallback that leaves a broken DKMS database behind.
-    remove_obsolete_dkms_registrations || return 1
     if install_with_dkms "$kernel_release"; then
+      # Never erase the fallback before its replacement builds and installs.
+      # Other installed kernels retain their existing modules.
+      remove_obsolete_dkms_registrations "$kernel_release" || return 1
       load_module || return $?
       log "installed DualSense USB module with DKMS for ${kernel_release}"
       return 0
