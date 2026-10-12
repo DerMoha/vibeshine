@@ -706,9 +706,9 @@ install_vibeshine() {
 open_firewall() {
   if systemctl is-active --quiet firewalld 2>/dev/null; then
     log 'Opening the Vibeshine ports in firewalld'
-    firewall-cmd --permanent --add-service=vibeshine >/dev/null && firewall-cmd --reload >/dev/null &&
+    firewall-cmd --reload >/dev/null && firewall-cmd --permanent --add-service=vibeshine >/dev/null && firewall-cmd --reload >/dev/null &&
       ok 'firewalld: service "vibeshine" allowed.' ||
-      warn 'firewalld: could not add the vibeshine service; run: sudo firewall-cmd --permanent --add-service=vibeshine && sudo firewall-cmd --reload'
+      warn 'firewalld: could not add the vibeshine service; run: sudo firewall-cmd --reload && sudo firewall-cmd --permanent --add-service=vibeshine && sudo firewall-cmd --reload'
   elif command -v ufw >/dev/null 2>&1 && LC_ALL=C ufw status 2>/dev/null | grep -q '^Status: active'; then
     log 'Opening the Vibeshine ports in ufw'
     ufw allow Vibeshine >/dev/null && ok 'ufw: application profile "Vibeshine" allowed.' ||
