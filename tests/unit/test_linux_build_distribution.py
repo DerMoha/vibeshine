@@ -41,7 +41,7 @@ printf '%s\\n' "${dependencies[@]}"
 ''')
         self.assertEqual(result.returncode, 0, result.stderr)
         dependencies = result.stdout.splitlines()
-        for dependency in ("gcc", "gcc-c++", "make", "sqlite-devel", "npm",
+        for dependency in ("gcc", "gcc-c++", "libstdc++-static", "make", "sqlite-devel", "npm",
                            "wayland-devel", "wayland-protocols-devel", "libayatana-appindicator-gtk3-devel"):
             self.assertIn(dependency, dependencies)
         self.assertNotIn("gccsystem", dependencies)

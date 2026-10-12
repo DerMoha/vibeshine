@@ -32,11 +32,12 @@ jobs:
             third-party/googletest third-party/glad third-party/inputtino third-party/nanors \
             third-party/nv-codec-headers third-party/plasma-wayland-protocols \
             third-party/wayland-protocols third-party/wlr-protocols third-party/tray
+      - name: Detect actual build budget
+        run: python3 scripts/linux-build-budget.py
       - name: Build regression
         run: python3 tests/unit/test_linux_build_distribution.py
       - name: Build native RPM without CUDA
         env:
-          BUILD_JOBS: '2'
           BUILD_VERSION: 2.0.0-fedora.validation
         run: bash scripts/linux_build.sh --sudo-off --skip-cuda
       - name: Inspect package
