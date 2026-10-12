@@ -44,7 +44,9 @@ jobs:
           BUILD_VERSION: 2.0.0-fedora.validation
         run: bash scripts/linux_build.sh --sudo-off --skip-cuda
       - name: Linux regression tests
-        run: ctest --test-dir build --output-on-failure -L 'fast|component' --timeout 60 -j 2
+        run: |
+          python3 tests/unit/test_linux_build_distribution.py
+          ctest --test-dir build --output-on-failure -L 'fast|component' --timeout 60 -j 2
       - name: Inspect package
         run: python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
       - name: Resolve RPM runtime dependencies without installation
