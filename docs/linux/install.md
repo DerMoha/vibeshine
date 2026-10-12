@@ -276,7 +276,7 @@ Sunshine/Apollo conflicts require explicit administrator resolution and a backup
 of their configuration/pairings. Existing VibeShine machine policy and state are
 preserved by the package lifecycle hooks.
 
-Install `make` before running the installer. It requires the exact running
+The installer installs `make` and DKMS before checking the exact running
 kernel's `kernel-devel-$(uname -r)` and checks both the build-tree Makefile and
 `make kernelrelease`. Nobara kernels need matching Nobara development packages;
 Fedora's generic headers are not a substitute. If that exact version is no
@@ -308,3 +308,6 @@ input and virtual-display creation/removal. Repeat after service restart,
 RPM upgrade, removal and reinstall, verifying pairing/configuration retention.
 Web UI reachability alone does not establish streaming readiness. No Nobara
 hardware or streaming success is asserted by these instructions.
+
+See [Nobara qualification](nobara-qualification.md) for the diagnostic report
+and actual-machine install, streaming and lifecycle test record.

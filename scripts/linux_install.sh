@@ -143,7 +143,7 @@ select_package_manager() {
 }
 
 package_installed() {
-  if [[ "$package_manager" == dnf ]]; then rpm -q "$1"; else pacman -Qq "$1"; fi
+  if [[ "$package_manager" == dnf ]]; then rpm -q "$1"; else pacman -Q "$1"; fi
 }
 
 install_rpm_kernel_headers() {

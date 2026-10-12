@@ -502,7 +502,7 @@ printf 'Relative packages resolve before old package hooks run from a safe worki
 (
   main_trace="$workdir/main-trace"
   for step in parse_args require_root select_package_manager run_checks install_kernel_headers \
-    check_session_restart install_vibeshine install_virtual_driver install_dualsense_driver \
+    check_session_restart install_vibeshine check_private_host_security install_virtual_driver install_dualsense_driver \
     open_firewall check_driver_state check_services; do
     eval "$step() { :; }"
   done
