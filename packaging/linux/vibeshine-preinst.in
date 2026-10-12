@@ -283,6 +283,14 @@ vibeshine_prepare_host_upgrade_fence() (
 
 vibeshine_activate_host_upgrade_fence() {
   systemctl daemon-reload || exit 1
+  # A drop-in cannot create a missing service on first installation. There is
+  # no old host to fence; still require its exact unit and cgroup to be idle.
+  vibeshine_host_load=$(timeout --signal=KILL 5 systemctl show vibeshine.service \
+    --property=LoadState 2>/dev/null) || exit 1
+  if [ "$vibeshine_host_load" = 'LoadState=not-found' ]; then
+    vibeshine_unit_is_quiescent vibeshine.service || exit 1
+    return 0
+  fi
   vibeshine_host_stop_properties=$(timeout --signal=KILL 5 systemctl show vibeshine.service \
     --property=RefuseManualStart --property=KillMode --property=SendSIGKILL 2>/dev/null) || exit 1
   printf '%s\n' "$vibeshine_host_stop_properties" | grep -qx 'RefuseManualStart=yes' || exit 1
