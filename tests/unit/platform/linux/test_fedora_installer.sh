@@ -35,6 +35,9 @@ dnf() {
   if ((create_headers)); then
     mkdir -p "$fixture/modules/$kernel_release/build"
     printf 'kernelrelease:\n\t@echo %s\n' "$kernel_release" > "$fixture/modules/$kernel_release/build/Makefile"
+    mkdir -p "$fixture/modules/$kernel_release/build/include/"{config,generated}
+    printf '%s\n' "$kernel_release" > "$fixture/modules/$kernel_release/build/include/config/kernel.release"
+    printf '#define UTS_RELEASE "%s"\n' "$kernel_release" > "$fixture/modules/$kernel_release/build/include/generated/utsrelease.h"
   fi
   return "$package_result"
 }
@@ -101,7 +104,15 @@ grep -Fx "install -y kernel-devel-$kernel_release" "$calls"
 rm "$calls"; create_headers=0
 install_rpm_kernel_headers "$fixture/modules"
 [[ ! -e "$calls" ]]
-printf 'kernelrelease:\n\t@echo wrong-kernel\n' > "$fixture/modules/$kernel_release/build/Makefile"
+# Nobara's Makefile reports the base version, but its prepared ABI is exact.
+printf 'kernelrelease:\n\t@echo 7.2.9\n' > "$fixture/modules/$kernel_release/build/Makefile"
+install_rpm_kernel_headers "$fixture/modules"
+printf 'wrong-kernel\n' > "$fixture/modules/$kernel_release/build/include/config/kernel.release"
+if (install_rpm_kernel_headers "$fixture/modules"); then exit 1; fi
+printf '%s\n' "$kernel_release" > "$fixture/modules/$kernel_release/build/include/config/kernel.release"
+printf '#define UTS_RELEASE "wrong-kernel"\n' > "$fixture/modules/$kernel_release/build/include/generated/utsrelease.h"
+if (install_rpm_kernel_headers "$fixture/modules"); then exit 1; fi
+rm "$fixture/modules/$kernel_release/build/include/generated/utsrelease.h"
 if (install_rpm_kernel_headers "$fixture/modules"); then exit 1; fi
 [[ ! -e "$calls" ]]
 rm "$fixture/modules/$kernel_release/build/Makefile"

@@ -147,14 +147,20 @@ package_installed() {
 }
 
 install_rpm_kernel_headers() {
-  local build_dir="${1:-/usr/lib/modules}/${kernel_release}/build" actual
+  local build_dir="${1:-/usr/lib/modules}/${kernel_release}/build" actual uts_release
   if [[ ! -f "$build_dir/Makefile" ]]; then
     dnf install "${dnf_confirm[@]}" "kernel-devel-${kernel_release}" ||
       die "Matching kernel-devel-${kernel_release} unavailable. Enable the kernel vendor repository or reboot into an installed kernel with matching devel files; then retry."
   fi
   [[ -f "$build_dir/Makefile" ]] || die "Missing $build_dir/Makefile"
-  actual=$(make --no-print-directory -s -C "$build_dir" kernelrelease) || die 'cannot validate kernel build tree'
+  # Vendor devel trees can report only the base version from `make kernelrelease`.
+  # The prepared release files determine the ABI used by external modules.
+  [[ -r "$build_dir/include/config/kernel.release" && -r "$build_dir/include/generated/utsrelease.h" ]] ||
+    die 'Kernel build tree lacks prepared release headers; reinstall matching kernel-devel.'
+  actual=$(cat "$build_dir/include/config/kernel.release") || die 'cannot read kernel build release'
+  uts_release=$(sed -n 's/^#define UTS_RELEASE "\([^"]*\)"$/\1/p' "$build_dir/include/generated/utsrelease.h") || die 'cannot read kernel UTS release'
   [[ "$actual" == "$kernel_release" ]] || die "Kernel build tree is for $actual, running $kernel_release; install matching kernel-devel."
+  [[ "$uts_release" == "$kernel_release" ]] || die "Prepared kernel UTS release is $uts_release, running $kernel_release; reinstall matching kernel-devel."
   ok "Exact running-kernel build tree verified: $actual"
 }
 
