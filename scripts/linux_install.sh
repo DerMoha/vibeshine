@@ -892,9 +892,12 @@ check_private_host_security() {
 }
 
 check_dkms_state() {
-  local status
+  local status line found=0
   status=$(dkms status -k "$kernel_release") || die 'cannot inspect DKMS state'
-  grep -Eq '^vibeshine-drm[/,].*: installed$' <<< "$status" ||
+  while IFS= read -r line; do
+    if [[ "$line" == vibeshine-drm/*", $kernel_release, "*": installed" ]]; then found=1; fi
+  done <<< "$status"
+  ((found)) ||
     die "Vibeshine DRM is not registered as installed in DKMS for $kernel_release. Review /var/lib/dkms/vibeshine-drm/*/build/make.log and retry the driver installer."
   ok "DKMS virtual-display installation verified for $kernel_release."
 }

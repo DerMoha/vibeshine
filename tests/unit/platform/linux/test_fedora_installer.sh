@@ -18,6 +18,7 @@ rpm() {
       if [[ "$*" == *FILENAMES* ]]; then printf '%s' "$fixture_payload";
       elif [[ "$*" == *EPOCHNUM* ]]; then printf '%s' "$candidate_version";
       else printf '%s' "$fixture_identity"; fi ;;
+    -qf) [[ -n "${fixture_owner:-}" ]] || return 1; printf '%s' "$fixture_owner" ;;
     --eval) printf '%s' "$fixture_comparison" ;;
     -q)
       if [[ "$*" == *EPOCHNUM* ]]; then
@@ -83,6 +84,13 @@ touch "$fixture/unowned"
 fixture_payload="$fixture/unowned"$'\t33261'
 if (install_rpm_package); then exit 1; fi
 [[ ! -e "$calls" ]]
+fixture_owner=unrelated
+if (install_rpm_package); then exit 1; fi
+[[ ! -e "$calls" ]]
+fixture_owner=vibeshine
+install_rpm_package
+rm "$calls"
+fixture_owner=''
 fixture_payload=$'/nonexistent-vibeshine-fixture\t33261'
 
 # Never substitute a different kernel's development tree.
@@ -146,6 +154,8 @@ done
 status_text="vibeshine-drm/2.0.0, $kernel_release, x86_64: installed"
 dkms() { printf '%s\n' "$status_text"; }
 check_dkms_state
+status_text="vibeshine-drm/2.0.0, wrong-kernel, x86_64: installed"
+if (check_dkms_state); then exit 1; fi
 status_text="vibeshine-drm/2.0.0, $kernel_release, x86_64: built"
 if (check_dkms_state); then exit 1; fi
 printf 'Fedora distribution, RPM upgrades/conflicts, kernel tree, session and DKMS checks passed.\n'

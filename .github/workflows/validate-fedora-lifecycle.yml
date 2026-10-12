@@ -1,0 +1,91 @@
+name: Validate Fedora RPM lifecycle
+on:
+  workflow_dispatch:
+  push:
+    branches: [fedora-native-install]
+    paths:
+      - '.github/workflows/validate-fedora-lifecycle.yml'
+      - 'scripts/tests/test_linux_rpm_lifecycle.sh'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fedora-lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Find the build branch's validated RPM
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Wait for this fork's current build; never install an arbitrary URL.
+          for attempt in $(seq 1 100); do
+            run=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow validate-fedora.yml \
+              --branch fedora-native-build --limit 1 --json databaseId,status,conclusion)
+            status=$(jq -r '.[0].status // empty' <<< "$run")
+            if [[ "$status" == completed ]]; then
+              [[ $(jq -r '.[0].conclusion' <<< "$run") == success ]] || {
+                echo 'The Fedora build must pass before package lifecycle testing.' >&2; exit 1;
+              }
+              echo "run_id=$(jq -r '.[0].databaseId' <<< "$run")" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo 'No completed Fedora build was available within 25 minutes.' >&2
+          exit 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: fedora44-rpm
+          path: packages
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.source.outputs.run_id }}
+      - name: Prepare disposable Fedora root
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y systemd-container
+          docker run --name vibeshine-fedora-root fedora:44 \
+            dnf install -y systemd systemd-udev dbus-broker procps-ng
+          mkdir rootfs
+          docker export vibeshine-fedora-root | sudo tar -xpf - -C rootfs
+          docker rm vibeshine-fedora-root
+          sudo rm -f rootfs/etc/machine-id
+          cp scripts/tests/test_linux_rpm_lifecycle.sh scripts/linux_install.sh packages/
+      - name: Test real package hooks under systemd
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo systemd-nspawn --boot --directory="$PWD/rootfs" \
+            --machine=vibeshine-rpm-test --bind-ro="$PWD/packages:/packages" \
+            > nspawn.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if sudo systemd-run --machine=vibeshine-rpm-test --wait --pipe /usr/bin/true; then break; fi
+            sleep 1
+          done
+          rpm=$(find packages -maxdepth 1 -name '*.rpm' -printf '%f\n')
+          [[ -n "$rpm" && "$rpm" != *$'\n'* ]]
+          sudo systemd-run --machine=vibeshine-rpm-test --wait --pipe --collect \
+            /usr/bin/bash /packages/test_linux_rpm_lifecycle.sh \
+            "/packages/$rpm" /packages/linux_install.sh
+      - name: Capture container journal
+        if: always()
+        run: |
+          sudo journalctl --directory=rootfs/var/log/journal --no-pager > container-journal.log || true
+          sudo machinectl terminate vibeshine-rpm-test || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: fedora-lifecycle-logs
+          path: |
+            nspawn.log
+            container-journal.log
+          if-no-files-found: warn
