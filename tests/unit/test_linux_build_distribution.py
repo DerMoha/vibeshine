@@ -71,6 +71,33 @@ run_step_cmake
             self.assertIn("-DSUNSHINE_ENABLE_CUDA=OFF", result.stdout.splitlines())
             self.assertIn("-DSUNSHINE_REQUIRE_CUDA_PASCAL=OFF", result.stdout.splitlines())
 
+    def test_native_install_has_regular_public_inode(self):
+        # Exercise the actual packaging rule with a small compiled executable;
+        # no host application dependencies or package installation are needed.
+        import shutil
+        if not shutil.which("cmake") or not shutil.which("cc"):
+            self.skipTest("CMake and a C compiler are required")
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            (stage / "main.c").write_text("int main(void) { return 0; }\n")
+            (stage / "CMakeLists.txt").write_text(
+                "cmake_minimum_required(VERSION 3.25)\nproject(Fixture C)\n"
+                "add_executable(sunshine main.c)\n"
+                "set_target_properties(sunshine PROPERTIES OUTPUT_NAME vibeshine VERSION 2.0.0)\n"
+                f'include("{ROOT / "cmake/packaging/unix.cmake"}")\n')
+            commands = [["cmake", "-S", temporary, "-B", str(stage / "build"),
+                         "-DCMAKE_SYSTEM_NAME=Linux", "-DCMAKE_INSTALL_PREFIX=/usr"],
+                        ["cmake", "--build", str(stage / "build")],
+                        ["cmake", "--install", str(stage / "build")]]
+            for command in commands:
+                result = subprocess.run(command, env=dict(os.environ, DESTDIR=str(stage / "install")),
+                                        text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            executable = stage / "install/usr/bin/vibeshine"
+            self.assertTrue(executable.is_file())
+            self.assertFalse(executable.is_symlink())
+            self.assertEqual(executable.stat().st_nlink, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
