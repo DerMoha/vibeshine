@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vibeshine installer for Arch Linux and CachyOS.
+# Vibeshine installer for Arch/CachyOS and Fedora/Nobara (native RPM).
 #
 # Vibeshine's Linux beta is developed and tested on CachyOS with KDE Plasma 6
 # on Wayland. Other Arch-based distributions are supported on a best-effort
@@ -16,12 +16,12 @@
 #   sudo bash linux_install.sh [options]
 #
 # Options:
-#   --version VERSION     Install this exact release (for example 2.0.0).
-#   --package FILE        Install a local vibeshine-*.pkg.tar.zst instead of downloading.
+#   --version VERSION     Install this exact Arch release (for example 2.0.0).
+#   --package FILE        Install a local Arch package or trusted native vibeshine RPM.
 #   --stable              Ignore pre-releases when picking the newest GitHub release.
 #   --no-repo             Skip the signed pacman repository and use GitHub releases.
 #   --skip-checks         Continue past failed requirement checks (not recommended).
-#   --yes                 Answer yes to pacman prompts.
+#   --yes                 Answer yes to package-manager prompts.
 #   -h, --help            Show this help.
 #
 # Re-running the script is safe; it only installs what is missing.
@@ -43,7 +43,6 @@ readonly MIN_KERNEL_MINOR=16
 readonly DRM_INSTALL='/usr/libexec/vibeshine/vibeshine-drm-install'
 readonly DS5_INSTALL='/usr/libexec/vibeshine/vibeshine-ds5-install'
 readonly MACHINE_HOST='/usr/libexec/vibeshine/vibeshine-machine-host'
-readonly PRIVATE_HOST='/usr/libexec/vibeshine/vibeshine-host'
 readonly SESSION_CONTROLLER='/usr/libexec/vibeshine/vibeshine-session-controller'
 
 requested_version=''
@@ -51,6 +50,8 @@ local_package=''
 allow_prerelease=1
 use_repo=1
 skip_checks=0
+package_manager=pacman
+dnf_confirm=()
 pacman_confirm=()
 replacement_confirm=()
 driver_overwrite=()
@@ -98,7 +99,7 @@ parse_args() {
       --stable) allow_prerelease=0; shift ;;
       --no-repo) use_repo=0; shift ;;
       --skip-checks) skip_checks=1; shift ;;
-      --yes) pacman_confirm=(--noconfirm)
+      --yes) dnf_confirm=(-y); pacman_confirm=(--noconfirm)
         replacement_confirm=(--noconfirm --ask=4); shift ;;
       -h | --help) usage; exit 0 ;;
       *) die "unknown option: $1 (see --help)" ;;
@@ -112,12 +113,97 @@ require_root() {
   fi
 }
 
+select_package_manager() {
+  # Keep this installer self-contained for the documented single-file download.
+  local release_file=${1:-/etc/os-release} ID='' ID_LIKE='' VERSION_ID=''
+  [[ -r "$release_file" ]] || die 'cannot read /etc/os-release'
+  # shellcheck source=/dev/null
+  source "$release_file"
+  os_id=$ID; os_version=$VERSION_ID
+  case "$ID" in
+    fedora|nobara) os_family=fedora ;;
+    arch|cachyos) os_family=arch ;;
+    *)
+      case " $ID_LIKE " in
+        *' fedora '*) os_family=fedora ;;
+        *' arch '*) os_family=arch ;;
+        *) os_family=$ID ;;
+      esac ;;
+  esac
+  case "$os_family" in
+    fedora)
+      package_manager=dnf
+      command -v dnf >/dev/null && command -v rpm >/dev/null || die 'DNF and RPM are required'
+      ((skip_checks == 0)) || die '--skip-checks is not supported for Fedora/Nobara'
+      [[ -z "$requested_version" ]] || die 'Fedora/Nobara uses --package; --version selects Arch release assets only'
+      ;;
+    arch) package_manager=pacman; require_pacman ;;
+    *) die "unsupported distribution: $os_id" ;;
+  esac
+}
+
+package_installed() {
+  if [[ "$package_manager" == dnf ]]; then rpm -q "$1"; else pacman -Qq "$1"; fi
+}
+
+install_rpm_kernel_headers() {
+  local build_dir="${1:-/usr/lib/modules}/${kernel_release}/build" actual
+  if [[ ! -f "$build_dir/Makefile" ]]; then
+    dnf install "${dnf_confirm[@]}" "kernel-devel-${kernel_release}" ||
+      die "Matching kernel-devel-${kernel_release} unavailable. Enable the kernel vendor repository or reboot into an installed kernel with matching devel files; then retry."
+  fi
+  [[ -f "$build_dir/Makefile" ]] || die "Missing $build_dir/Makefile"
+  actual=$(make --no-print-directory -s -C "$build_dir" kernelrelease) || die 'cannot validate kernel build tree'
+  [[ "$actual" == "$kernel_release" ]] || die "Kernel build tree is for $actual, running $kernel_release; install matching kernel-devel."
+  ok "Exact running-kernel build tree verified: $actual"
+}
+
+validate_rpm_package() {
+  local identity conflict installed_epoch candidate_epoch comparison
+  [[ -n "$local_package" && -f "$local_package" ]] ||
+    die 'Fedora/Nobara requires --package /absolute/path/vibeshine.rpm from a trusted native build; no RPM release repository is configured.'
+  identity=$(rpm -qp --qf '%{NAME} %{ARCH}' -- "$local_package") || die 'cannot inspect RPM'
+  [[ "$identity" == 'vibeshine x86_64' ]] || die "unexpected RPM identity: $identity"
+  # DNF install must not implicitly downgrade an already installed host.
+  # RPM compares Epoch:Version-Release through its own Lua version comparator.
+  if installed_epoch=$(rpm -q --qf '%{EPOCHNUM}:%{VERSION}-%{RELEASE}' vibeshine 2>/dev/null); then
+    candidate_epoch=$(rpm -qp --qf '%{EPOCHNUM}:%{VERSION}-%{RELEASE}' -- "$local_package") || die 'cannot inspect RPM version'
+    [[ "$installed_epoch" =~ ^[0-9]+:[A-Za-z0-9._+~^-]+$ &&
+       "$candidate_epoch" =~ ^[0-9]+:[A-Za-z0-9._+~^-]+$ ]] || die 'cannot compare RPM versions safely'
+    comparison=$(rpm --eval "%{lua:print(rpm.vercmp('$candidate_epoch', '$installed_epoch'))}") || die 'RPM version comparison failed'
+    case "$comparison" in -1|0|1) ;; *) die 'RPM version comparison returned an invalid result' ;; esac
+    if [[ "$comparison" == -1 ]]; then
+      die "Refusing RPM downgrade from $installed_epoch to $candidate_epoch. Select a matching or newer build."
+    fi
+  fi
+  for conflict in sunshine apollo vibepollo; do
+    if rpm -q "$conflict" >/dev/null 2>&1; then
+      die "$conflict is installed. Back up its configuration and pairings and explicitly resolve the conflict before retrying; no packages were removed."
+    fi
+  done
+}
+
+install_rpm_package() {
+  local package_path
+  validate_rpm_package
+  package_path=$(readlink -f -- "$local_package") || die 'cannot resolve RPM path'
+  # DNF handles dependency resolution and normal upgrades. Never --allowerasing,
+  # --replacefiles, --nodeps, or delete persistent machine state.
+  run_from_root dnf install "${dnf_confirm[@]}" -- "$package_path" ||
+    die 'RPM transaction failed. Inspect DNF output; configuration and pairing data were not reset.'
+}
+
 require_pacman() {
   command -v pacman >/dev/null 2>&1 ||
-    die 'pacman was not found. The Linux beta ships as a native package for Arch Linux and CachyOS only.'
+    die 'pacman was not found. Install pacman for this Arch-derived distribution.'
 }
 
 check_distribution() {
+  if [[ "$package_manager" == dnf ]]; then
+    ok "${os_id} ${os_version}: Fedora RPM installation selected (runtime qualification required)."
+    [[ $(uname -m) == x86_64 ]] || fail 'Only x86_64 RPMs are supported.'
+    return
+  fi
   local id='' name='' id_like=''
   if [[ -r /etc/os-release ]]; then
     # shellcheck disable=SC1091
@@ -195,6 +281,10 @@ check_kernel() {
     fail "Linux ${kernel_release} is older than ${MIN_KERNEL_MAJOR}.${MIN_KERNEL_MINOR}; the virtual-display driver will not build."
   fi
 
+  if [[ "$package_manager" == dnf ]]; then
+    headers_package="kernel-devel-${kernel_release}"
+    return
+  fi
   check_retired_kernel "$modules_root"
   if kernel_package=$(kernel_package_for "$kernel_release" "$modules_root"); then
     headers_package="${kernel_package}-headers"
@@ -205,6 +295,10 @@ check_kernel() {
 }
 
 install_kernel_headers() {
+  if [[ "$package_manager" == dnf ]]; then
+    install_rpm_kernel_headers
+    return
+  fi
   local build_dir="/usr/lib/modules/${kernel_release}/build"
   if [[ -f "${build_dir}/Makefile" ]]; then
     ok "Kernel headers for ${kernel_release} are already installed."
@@ -223,13 +317,62 @@ install_kernel_headers() {
   fi
 }
 
+check_fedora_desktop() {
+  local version manager session properties key value
+  local type='' desktop='' active='' seat='' remote='' role='' service=''
+  version=$(rpm -q --qf '%{VERSION}' plasma-workspace 2>/dev/null) || {
+    fail 'KDE Plasma workspace is missing; install the Fedora/Nobara KDE Plasma desktop.'
+    return
+  }
+  [[ "$version" =~ ^([0-9]+)\. ]] && ((BASH_REMATCH[1] >= 6)) || {
+    fail "KDE Plasma 6 or later is required; found $version."
+    return
+  }
+  ok "KDE Plasma $version is installed."
+  [[ -x /usr/bin/kwin_wayland ]] || fail 'KWin Wayland is missing; install the KDE Plasma Wayland session.'
+  if ! package_installed plasma-login-manager >/dev/null 2>&1 &&
+     ! package_installed sddm >/dev/null 2>&1; then
+    fail 'Install and configure Plasma Login Manager or SDDM before installing Vibeshine.'
+  fi
+  manager=$(systemctl show display-manager.service --property=Id --value 2>/dev/null) || manager=''
+  case "$manager" in
+    plasmalogin.service|sddm.service)
+      systemctl is-active --quiet "$manager" || fail "$manager is not active."
+      ;;
+    *) fail "Unsupported or missing active display manager: ${manager:-unknown}." ;;
+  esac
+  session=$(loginctl show-seat seat0 --property=ActiveSession --value 2>/dev/null) || session=''
+  [[ "$session" =~ ^[A-Za-z0-9_-]+$ ]] || { fail 'No active local seat0 session; log in to KDE Plasma Wayland and retry.'; return; }
+  properties=$(loginctl show-session "$session" --no-pager --property=Type --property=Desktop \
+    --property=Active --property=Seat --property=Remote --property=Class --property=Service) || {
+    fail 'Cannot inspect the active logind session.'; return;
+  }
+  while IFS='=' read -r key value; do
+    case "$key" in
+      Type) type=$value ;; Desktop) desktop=$value ;; Active) active=$value ;;
+      Seat) seat=$value ;; Remote) remote=$value ;; Class) role=$value ;; Service) service=$value ;;
+    esac
+  done <<< "$properties"
+  [[ "$type:$active:$seat:$remote" == wayland:yes:seat0:no ]] || {
+    fail 'The active seat0 session must be local and use Wayland; select KDE Plasma (Wayland) at login.'; return;
+  }
+  case "$role:$service:$desktop" in
+    user:plasmalogin:KDE*|user:plasmalogin-autologin:KDE*|user:sddm:KDE*|user:sddm-autologin:KDE*|user:plasmalogin:plasma|user:plasmalogin-autologin:plasma|user:sddm:plasma|user:sddm-autologin:plasma)
+      ok "Active KDE Plasma Wayland session: $session" ;;
+    greeter:plasmalogin-greeter:*)
+      warn 'Plasma Login Manager Wayland greeter is active. Desktop streaming still needs a KDE Plasma Wayland login.' ;;
+    *) fail "Unsupported seat0 session: class=$role service=$service desktop=$desktop. Log in through Plasma Login Manager or SDDM." ;;
+  esac
+}
+
 check_desktop() {
-  if pacman -Qq plasma-workspace >/dev/null 2>&1 || pacman -Qq plasma-desktop >/dev/null 2>&1; then
+  if [[ "$package_manager" == dnf ]]; then check_fedora_desktop; return; fi
+  if package_installed plasma-workspace >/dev/null 2>&1 || package_installed plasma-desktop >/dev/null 2>&1; then
     ok "KDE Plasma is installed."
   else
     fail "KDE Plasma is not installed. Vibeshine streams only a KDE Plasma 6 Wayland desktop (install plasma-meta or plasma-desktop)."
   fi
-  if pacman -Qq sddm >/dev/null 2>&1 || pacman -Qq plasma-login-manager >/dev/null 2>&1; then
+  if package_installed sddm >/dev/null 2>&1 || package_installed plasma-login-manager >/dev/null 2>&1; then
     ok "A supported login manager (SDDM or Plasma Login Manager) is installed."
   else
     warn "Neither sddm nor plasma-login-manager is installed. Vibeshine only attaches to Plasma sessions started by one of them."
@@ -264,6 +407,10 @@ check_gpu() {
        [[ "$(cat /sys/module/nvidia_drm/parameters/modeset)" != Y ]]; then
       warn "nvidia_drm.modeset is disabled. Plasma Wayland and KMS capture need nvidia_drm.modeset=1 on the kernel command line."
     fi
+  fi
+  if [[ "$package_manager" == dnf ]]; then
+    warn "GPU encoder availability is unverified. Inspect lspci -nn and vainfo (H.264 encode entrypoints), or NVIDIA driver/NVENC support; confirm H.264 in a real stream."
+    return
   fi
   if ((amd)); then
     if pacman -Qq libva-mesa-driver >/dev/null 2>&1; then
@@ -304,6 +451,9 @@ run_checks() {
   check_desktop
   check_gpu
   check_secure_boot
+  if [[ "$package_manager" == dnf ]] && command -v getenforce >/dev/null 2>&1; then
+    ok "SELinux mode: $(getenforce). No SELinux policy or security mode is changed."
+  fi
   if ((check_failures > 0)); then
     if ((skip_checks)); then
       warn "${check_failures} requirement check(s) failed; continuing because --skip-checks was given."
@@ -511,6 +661,10 @@ install_from_package() {
 
 install_vibeshine() {
   workdir=$(mktemp -d)
+  if [[ "$package_manager" == dnf ]]; then
+    install_rpm_package
+    return
+  fi
   if [[ -n "$local_package" ]]; then
     install_from_package
     return
@@ -606,7 +760,7 @@ check_driver_state() {
 check_session_restart() {
   # First installation adds KWin startup hooks. A running greeter/desktop
   # predates those hooks even when the newly installed DRM module loads.
-  if ! pacman -Q vibeshine >/dev/null 2>&1; then
+  if ! package_installed vibeshine >/dev/null 2>&1; then
     reboot_required=1
     warn 'First installation requires a reboot so the login screen and desktop load the Vibeshine display and session integration.'
   fi
@@ -667,7 +821,9 @@ repair_machine_setup() {
 
 check_services() {
   if systemctl is-enabled --quiet vibeshine-session-controller.service 2>/dev/null; then
-    ok 'vibeshine-session-controller.service is enabled.'
+    systemctl is-active --quiet vibeshine-session-controller.service ||
+      die 'the session controller is not active; inspect journalctl -u vibeshine-session-controller.service -b'
+    ok 'vibeshine-session-controller.service is enabled and active.'
   else
     die 'the configured session controller is not enabled; installation is not complete'
   fi
@@ -698,25 +854,51 @@ print_summary() {
 }
 
 check_private_host_security() {
-  local expected='cap_sys_admin,cap_sys_nice=p' actual
-  [[ -e "$PRIVATE_HOST" ]] || return 0
-  actual=$(getcap -n "$PRIVATE_HOST" 2>/dev/null || true)
-  [[ "$actual" == "$PRIVATE_HOST $expected" ]] ||
-    die 'installed private host executable has incorrect capabilities'
-  ok 'Private host executable capabilities verified.'
+  local root=${1:-} relative expected mode group actual path
+  for relative in usr/bin/vibeshine usr/libexec/vibeshine/vibeshine-session-exec \
+    usr/libexec/vibeshine/vibeshine-host usr/libexec/vibeshine/vibeshine-session-broker; do
+    path="$root/$relative"
+    expected=''; mode=755; group=root
+    case "$relative" in
+      */vibeshine-host) expected='cap_sys_admin,cap_sys_nice=p'; mode=750; group=vibeshine ;;
+      */vibeshine-session-broker) expected='cap_kill,cap_setgid,cap_setuid=p'; mode=700 ;;
+    esac
+    [[ -f "$path" && ! -L "$path" && -x "$path" &&
+       $(stat -c '%U:%G:%a:%h' -- "$path") == "root:$group:$mode:1" ]] ||
+      die "missing or unsafe executable ownership/mode: $path"
+    actual=$(getcap -n "$path" 2>/dev/null) || die "cannot inspect capabilities: $path"
+    [[ -z "$expected" ]] || expected="$path $expected"
+    [[ "$actual" == "$expected" ]] || die "incorrect executable capabilities: $path"
+  done
+  ok 'Public executables and private host/broker ownership, modes and capabilities verified.'
+}
+
+check_dkms_state() {
+  local status
+  status=$(dkms status -k "$kernel_release") || die 'cannot inspect DKMS state'
+  grep -Eq '^vibeshine-drm[/,].*: installed$' <<< "$status" ||
+    die "Vibeshine DRM is not registered as installed in DKMS for $kernel_release. Review /var/lib/dkms/vibeshine-drm/*/build/make.log and retry the driver installer."
+  ok "DKMS virtual-display installation verified for $kernel_release."
 }
 
 main() {
   parse_args "$@"
   require_root
-  require_pacman
+  select_package_manager
   run_checks
+  if [[ "$package_manager" == dnf ]]; then
+    validate_rpm_package
+    dnf install "${dnf_confirm[@]}" dkms gcc make elfutils-libelf-devel openssl kmod mokutil ||
+      die 'Could not install DKMS/build tools. Check enabled Fedora/Nobara repositories and retry.'
+    dkms --version || die 'DKMS is unavailable after dependency installation'
+  fi
   install_kernel_headers
   check_session_restart
   install_vibeshine
   check_private_host_security
   install_virtual_driver
   install_dualsense_driver
+  if [[ "$package_manager" == dnf ]]; then check_dkms_state; fi
   repair_machine_setup || die 'machine setup recovery failed; installation is not complete'
   open_firewall
   check_driver_state

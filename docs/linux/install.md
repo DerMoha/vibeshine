@@ -257,3 +257,54 @@ sudo pacman -R vibeshine
 Removal stops the services and removes the DKMS module but keeps `/var/lib/vibeshine` and
 `/etc/vibeshine`. To wipe them as well, run
 `sudo vibeshine reset` before removing the package.
+
+## Fedora and Nobara native RPM (awaiting hardware qualification)
+
+Fedora derivatives are detected by `ID` and the space-separated `ID_LIKE`
+fields in `/etc/os-release`, including Nobara. The base build uses the distro's
+`gcc`/`g++` and starts without CUDA:
+
+```bash
+bash scripts/linux_build.sh --skip-cuda
+sudo bash scripts/linux_install.sh --package /absolute/path/vibeshine.rpm
+```
+
+Use a trusted locally built RPM. There is no configured Fedora release
+repository; the installer requires an explicit package. DNF resolves dependencies
+and upgrades without automatic conflict erasure or a full distribution upgrade.
+Sunshine/Apollo conflicts require explicit administrator resolution and a backup
+of their configuration/pairings. Existing VibeShine machine policy and state are
+preserved by the package lifecycle hooks.
+
+Install `make` before running the installer. It requires the exact running
+kernel's `kernel-devel-$(uname -r)` and checks both the build-tree Makefile and
+`make kernelrelease`. Nobara kernels need matching Nobara development packages;
+Fedora's generic headers are not a substitute. If that exact version is no
+longer available, boot an installed kernel with matching development files and
+retry. DKMS, GCC, make, ELF development libraries and module tools are installed
+before the RPM. Future kernel updates also need matching kernel-devel packages.
+A loaded module cannot always be replaced safely: follow reboot diagnostics.
+Secure Boot must remain enabled when in use; follow the existing driver's MOK
+signing/enrollment diagnostics. Do not disable SELinux to work around failures;
+collect AVC diagnostics and report them.
+
+KDE Plasma Wayland and either Plasma Login Manager or SDDM are required. Identify
+the GPU with `lspci -nn`; for AMD/Intel inspect `vainfo` for H.264 encode
+entrypoints, and for NVIDIA verify the proprietary driver and NVENC support.
+Driver packages and codec availability depend on the enabled vendor repositories.
+An encoder package being installed is not proof that hardware encoding works.
+
+Remove with `sudo dnf remove vibeshine`; ordinary removal preserves
+`/etc/vibeshine` and `/var/lib/vibeshine`. Back these up before upgrade/removal
+tests. Reinstall the trusted RPM to recover; inspect DNF and system journal
+errors rather than bypassing checks. Only the session controller should be
+enabled; it owns starting the host and socket for a valid session.
+
+Qualification is still required on Nobara 44 kernel
+`7.2.9-200.nobara.fc44.x86_64`: check DKMS status and loaded module version,
+controller/service logs and privileged-file capabilities, reboot, access
+`https://localhost:47990`, pair Moonlight, and stream H.264 with working audio,
+input and virtual-display creation/removal. Repeat after service restart,
+RPM upgrade, removal and reinstall, verifying pairing/configuration retention.
+Web UI reachability alone does not establish streaming readiness. No Nobara
+hardware or streaming success is asserted by these instructions.

@@ -12,6 +12,20 @@ on:
 permissions:
   contents: read
 jobs:
+  installer-regression:
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    timeout-minutes: 10
+    steps:
+      - name: Bootstrap
+        run: dnf install -y git python3 make findutils
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Installer and machine lifecycle regressions
+        run: |
+          bash tests/unit/platform/linux/test_fedora_installer.sh
+          bash tests/unit/platform/linux/test_linux_installer.sh
+          python3 tests/unit/platform/linux/test_machine_service_contract.py "$PWD"
+          python3 tests/unit/platform/linux/test_profile_upgrade.py "$PWD"
   rpm:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
