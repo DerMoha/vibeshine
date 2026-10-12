@@ -11,6 +11,9 @@ python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
 
 The build script installs dependencies through sudo. `--sudo-off` is for
 isolated root build containers. It does not upgrade the Fedora distribution.
+The optional COPR spec also accepts `rpmbuild --without cuda`; its default
+CUDA release build remains unchanged.
+
 RPMs are produced by the existing CPack architecture in `build/cpack_artifacts`;
 they include both Web UIs, machine services, session helpers and DKMS sources.
 The package pre-install hook creates the dedicated service account before RPM
