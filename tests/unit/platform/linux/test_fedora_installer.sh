@@ -260,3 +260,11 @@ printf 'Socket lifecycle checks preserve idle/cgroup requirements without MainPI
   if (vibeshine_activate_host_upgrade_fence); then exit 1; fi
 )
 printf 'First-install and interrupted-install fences retain idle and upgrade guards.\n'
+(
+  systemctl() { [[ "$*" == 'is-active --quiet firewalld' ]]; }
+  firewall_trace="$fixture/firewall"
+  firewall-cmd() { printf '%s\n' "$*" >> "$firewall_trace"; }
+  open_firewall
+  [[ $(< "$firewall_trace") == $'--reload\n--permanent --add-service=vibeshine\n--reload' ]]
+)
+printf 'Firewalld loads the packaged service definition before enabling it.\n'
