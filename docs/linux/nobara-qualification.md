@@ -112,11 +112,11 @@ interactive tests.
 | DRM module loads | Installed and loaded version match; no load errors | Passed: installed/loaded version 2.0.0 |
 | Service/controller session binding | System service status and relevant journal excerpt | Passed: ready desktop session 2, host active/running |
 | HTTPS Web UI | Browser reaches `https://localhost:47990` | HTTP 200 verified; interactive login pending |
-| Moonlight pairing | PIN accepted; client reconnects | Pending |
-| Hardware H.264 | Host log identifies hardware encoder; real video stream | Pending |
-| Audio and input | Audible audio; keyboard/mouse/controller in session | Pending |
-| Virtual display | Create/remove display; original topology restored | Pending |
-| Service restart | Warn viewer, restart controller, reconnect, inspect recovery | Pending |
+| Moonlight pairing | PIN accepted; client reconnects | Passed: Moonlight 6.2.0 on macOS, reconnect after controller restart |
+| Hardware H.264 | Host log identifies hardware encoder; real video stream | Passed: live 1280x720 H.264 using h264_vaapi |
+| Audio and input | Audible audio; keyboard/mouse/controller in session | Keyboard passed; audio transport/CoreAudio initialized; audible and physical controller checks pending |
+| Virtual display | Create/remove display; original topology restored | Virtual-1 captured; all eight virtual outputs disabled after quitting Desktop; physical baseline verification pending |
+| Service restart | Warn viewer, restart controller, reconnect, inspect recovery | Passed: stopped test stream, restarted controller, paired client reconnected |
 | Reboot | Driver/controller recover; paired client reconnects | Pending |
 | Upgrade | Install a higher native version; configuration/pairings retained | Pending |
 | Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Pending |
@@ -131,8 +131,21 @@ active/running, and the local HTTPS UI returns 200. The host discovers
 The same 145 CTest cases passed after the KMS routing fix. Privileged ownership,
 mode, link count and file capabilities were checked on the installed payload;
 the active firewalld zone allows the packaged service after definition reload.
-Moonlight 6.2.0 was installed on the owner's Mac and reached the pairing PIN
-dialog; completed pairing and streaming are still pending.
+Moonlight 6.2.0 was installed on the owner's Mac, paired, and completed a live
+H.264 stream from Virtual-1. Keyboard input opened Konsole and ran a test
+command; the virtual keyboard also emitted matching libinput events. Client
+logs show stereo CoreAudio output and received audio packets; a five-second
+stereo tone was played into the host's stream sink. Audible output was not
+observed. The idle-desktop stream reported approximately 19–20 FPS, with zero
+network frame drops in the observed stable statistics; this does not establish
+60 FPS performance under game load.
+
+Input testing found that uinput was not loaded and a pre-existing uaccess ACL
+retained `group::---` after udev assigned the dedicated group. Loading uinput
+and restoring only that group's `rw` ACL allowed the host to create its virtual
+keyboard and mouse. The package now loads uinput at install/boot, preserves
+existing user ACLs during recovery, and the DNF installer verifies that the
+service identity with its dedicated input group can actually open `/dev/uinput`.
 
 For logs, use `sudo journalctl -u vibeshine-session-controller.service
 -u vibeshine.service -b --no-pager`. Review logs before sharing. A reachable Web
