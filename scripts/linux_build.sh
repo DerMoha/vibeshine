@@ -412,11 +412,21 @@ function add_fedora_deps() {
     "cmake"
     "desktop-file-utils"
     "${DOXYGEN}"
-    "gcc${gcc_version}"
-    "gcc${gcc_version}-c++"
+    "gcc"
+    "gcc-c++"
+    "make"
+    "pkgconf-pkg-config"
+    "systemd-devel"
+    "wayland-devel"
+    "wayland-protocols-devel"
+    "sqlite-devel"
+    "nodejs"
+    "npm"
+    "tar"
+    "xz"
     "git"
     "graphviz"
-    "libappindicator-gtk3-devel"
+    "libayatana-appindicator-gtk3-devel"
     "libappstream-glib"
     "libcap-devel"
     "libcurl-devel"
@@ -570,19 +580,15 @@ function run_step_deps() {
     add_ubuntu_deps
   elif [[ "$distro" == "fedora" ]]; then
     add_fedora_deps
-    ${sudo_cmd} dnf group install "development-tools" -y
+    # Explicit dependencies work with both DNF4 and DNF5.
   fi
 
   # Install the dependencies
   $package_install_command "${dependencies[@]}"
 
-  # reload the environment
-  # shellcheck source=/dev/null
-  source ~/.bashrc
 
   #set gcc version based on distros
-  export CC=gcc-${gcc_version}
-  export CXX=g++-${gcc_version}
+  select_compilers
 
   # compile cmake if the version is too low
   if ! check_version "cmake" "$cmake_min" "inf"; then
@@ -647,8 +653,7 @@ function run_step_cmake() {
   fi
 
   #set gcc version based on distros
-  export CC=gcc-${gcc_version}
-  export CXX=g++-${gcc_version}
+  select_compilers
 
   # prepare CMAKE args
   cmake_args=(
@@ -674,13 +679,13 @@ function run_step_cmake() {
 
   # Publisher metadata
   if [[ -n "$publisher_name" ]]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_NAME='${publisher_name}'")
+    cmake_args+=("-DSUNSHINE_PUBLISHER_NAME=${publisher_name}")
   fi
   if [[ -n "$publisher_website" ]]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_WEBSITE='${publisher_website}'")
+    cmake_args+=("-DSUNSHINE_PUBLISHER_WEBSITE=${publisher_website}")
   fi
   if [[ -n "$publisher_issue_url" ]]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_ISSUE_URL='${publisher_issue_url}'")
+    cmake_args+=("-DSUNSHINE_PUBLISHER_ISSUE_URL=${publisher_issue_url}")
   fi
 
   # Handle doxygen docs flag
@@ -693,10 +698,10 @@ function run_step_cmake() {
     cmake_args+=("-DSUNSHINE_ENABLE_CUDA=ON" "-DSUNSHINE_REQUIRE_CUDA_PASCAL=ON")
     if [[ -n "$nvcc_path" ]]; then
       cmake_args+=("-DCMAKE_CUDA_COMPILER:PATH=$nvcc_path")
-      cmake_args+=("-DCMAKE_CUDA_HOST_COMPILER=gcc-${gcc_version}")
+      cmake_args+=("-DCMAKE_CUDA_HOST_COMPILER=${CC}")
     fi
   else
-    cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF")
+    cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF" "-DSUNSHINE_REQUIRE_CUDA_PASCAL=OFF")
   fi
 
   # Cmake stuff here
@@ -790,9 +795,11 @@ function run_install() {
 }
 
 # Determine the OS and call the appropriate function
+source "$(dirname "${BASH_SOURCE[0]}")/linux_distribution.sh"
+detect_linux_distribution
 cat /etc/os-release
 
-if grep -q "Arch Linux" /etc/os-release; then
+if [[ "$os_family" == arch ]]; then
   distro="arch"
   version=""
   package_update_command="${sudo_cmd} pacman -Syu --noconfirm"
@@ -810,30 +817,16 @@ elif grep -q "Debian GNU/Linux 13 (trixie)" /etc/os-release; then
   package_update_command="${sudo_cmd} apt-get update"
   package_install_command="${sudo_cmd} apt-get install -y"
   gcc_version="14"
-elif grep -q "PLATFORM_ID=\"platform:f42\"" /etc/os-release; then
+elif [[ "$os_family" == fedora ]]; then
   distro="fedora"
-  version="42"
-  package_update_command="${sudo_cmd} dnf update -y"
+  version="$os_version"
+  package_update_command="${sudo_cmd} dnf makecache"
   package_install_command="${sudo_cmd} dnf install -y"
-  gcc_version="14"
-elif grep -q '^ID=fedora$' /etc/os-release && grep -q '^VERSION_ID=43$' /etc/os-release; then
-  distro="fedora"
-  version="43"
-  package_update_command="${sudo_cmd} dnf update -y"
-  package_install_command="${sudo_cmd} dnf install -y"
-  gcc_version="14"
-elif grep -q '^ID=fedora$' /etc/os-release && grep -q '^VERSION_ID=44$' /etc/os-release; then
-  distro="fedora"
-  version="44"
-  package_update_command="${sudo_cmd} dnf update -y"
-  package_install_command="${sudo_cmd} dnf install -y"
-  gcc_version="14"
-elif grep -q '^ID=fedora$' /etc/os-release && grep -q '^VERSION_ID=45$' /etc/os-release; then
-  distro="fedora"
-  version="45"
-  package_update_command="${sudo_cmd} dnf update -y"
-  package_install_command="${sudo_cmd} dnf install -y"
-  gcc_version="14"
+  gcc_version="system"
+  if [[ "$skip_cuda" == 0 && -z "${CC:-}" ]]; then
+    echo "Fedora CUDA builds require an explicitly selected CUDA-compatible CC and CXX. Start with --skip-cuda." >&2
+    exit 1
+  fi
 elif grep -q "Ubuntu 22.04" /etc/os-release; then
   distro="ubuntu"
   version="22.04"
@@ -881,11 +874,20 @@ if [[ "$architecture" != "x86_64" ]] && [[ "$architecture" != "${AARCH64}" ]]; t
   exit 1
 fi
 
+select_compilers() {
+  if [[ "$distro" == fedora ]]; then
+    export CC="${CC:-gcc}" CXX="${CXX:-g++}"
+  else
+    export CC="${CC:-gcc-${gcc_version}}" CXX="${CXX:-g++-${gcc_version}}"
+  fi
+}
+select_compilers
+
 # export variables for github actions ci
 if [[ -f "$GITHUB_ENV" ]]; then
   {
-    echo "CC=gcc-${gcc_version}"
-    echo "CXX=g++-${gcc_version}"
+    echo "CC=${CC}"
+    echo "CXX=${CXX}"
     echo "GCC_VERSION=${gcc_version}"
   } >> "$GITHUB_ENV"
 fi

@@ -1,0 +1,45 @@
+name: Validate Fedora RPM
+on:
+  workflow_dispatch:
+  push:
+    branches: [fedora-native-build, fedora-native-install]
+  pull_request:
+    paths:
+      - 'scripts/linux_*.sh'
+      - 'cmake/packaging/linux.cmake'
+      - 'packaging/linux/**'
+      - '.github/workflows/validate-fedora.yml'
+permissions:
+  contents: read
+jobs:
+  rpm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container: fedora:44
+    steps:
+      - name: Bootstrap
+        run: dnf install -y git nodejs npm findutils which make python3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          submodules: false
+      - name: Initialize Linux dependencies
+        run: |
+          git -c safe.directory="$GITHUB_WORKSPACE" submodule update --init --recursive --depth 1 -- \
+            third-party/build-deps third-party/Simple-Web-Server third-party/moonlight-common-c \
+            third-party/libdisplaydevice third-party/libvirtualdisplay third-party/libvirtualgamepad \
+            third-party/googletest third-party/glad third-party/inputtino third-party/nanors \
+            third-party/nv-codec-headers third-party/plasma-wayland-protocols \
+            third-party/wayland-protocols third-party/wlr-protocols third-party/tray
+      - name: Build regression
+        run: python3 tests/unit/test_linux_build_distribution.py
+      - name: Build native RPM without CUDA
+        env:
+          BUILD_JOBS: '2'
+        run: bash scripts/linux_build.sh --sudo-off --skip-cuda
+      - name: Inspect package
+        run: python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fedora44-rpm
+          path: 'build/cpack_artifacts/*.rpm'
+          if-no-files-found: error
