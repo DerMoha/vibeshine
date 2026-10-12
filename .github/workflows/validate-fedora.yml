@@ -2,13 +2,8 @@ name: Validate Fedora RPM
 on:
   workflow_dispatch:
   push:
-    branches: [fedora-native-build, fedora-native-install]
+    branches: [master, main, fedora-native-build, fedora-native-install]
   pull_request:
-    paths:
-      - 'scripts/linux_*.sh'
-      - 'cmake/packaging/linux.cmake'
-      - 'packaging/linux/**'
-      - '.github/workflows/validate-fedora.yml'
 concurrency:
   group: fedora-rpm-${{ github.ref }}
   cancel-in-progress: true
@@ -30,8 +25,6 @@ jobs:
           python3 tests/unit/platform/linux/test_machine_service_contract.py "$PWD"
           python3 tests/unit/platform/linux/test_profile_upgrade.py "$PWD"
   rpm:
-    # Installer-only fork pushes reuse the build branch's package validation.
-    if: github.event_name != 'push' || github.ref_name == 'fedora-native-build'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     container: fedora:44
@@ -76,3 +69,9 @@ jobs:
           name: fedora44-rpm
           path: 'build/cpack_artifacts/*.rpm'
           if-no-files-found: error
+  lifecycle:
+    needs: rpm
+    uses: ./.github/workflows/validate-fedora-lifecycle.yml
+    permissions:
+      contents: read
+      actions: read
