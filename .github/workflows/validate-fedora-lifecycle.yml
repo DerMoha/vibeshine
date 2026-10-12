@@ -58,7 +58,8 @@ jobs:
           mkdir rootfs
           docker export vibeshine-fedora-root | sudo tar -xpf - -C rootfs
           docker rm vibeshine-fedora-root
-          sudo rm -f rootfs/etc/machine-id
+          # Avoid first-boot presets undoing the explicitly enabled test bus.
+          systemd-id128 new | sudo tee rootfs/etc/machine-id >/dev/null
           cp scripts/tests/test_linux_rpm_lifecycle.sh scripts/linux_install.sh packages/
       - name: Test real package hooks under systemd
         shell: bash
