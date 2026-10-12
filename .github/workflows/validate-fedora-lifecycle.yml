@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo systemd-nspawn --boot --directory="$PWD/rootfs" \
-            --machine=vibeshine-rpm-test --bind-ro="$PWD/packages:/packages" \
+            --machine=vibeshine-rpm-test --resolv-conf=bind-host --bind-ro="$PWD/packages:/packages" \
             > nspawn.log 2>&1 &
           for attempt in $(seq 1 60); do
             if sudo systemd-run --machine=vibeshine-rpm-test --wait --pipe /usr/bin/true; then break; fi
