@@ -114,7 +114,7 @@ interactive tests.
 | HTTPS Web UI | Browser reaches `https://localhost:47990` | HTTP 200 verified; interactive login pending |
 | Moonlight pairing | PIN accepted; client reconnects | Passed: Moonlight 6.2.0 on macOS, reconnect after controller restart |
 | Hardware H.264 | Host log identifies hardware encoder; real video stream | Passed: live 1280x720 H.264 using h264_vaapi |
-| Audio and input | Audible audio; keyboard/mouse/controller in session | Keyboard passed; audio transport/CoreAudio initialized; audible and physical controller checks pending |
+| Audio and input | Audible audio; keyboard/mouse/controller in session | Owner confirmed mouse, keyboard and audible audio on Mac; Steam Deck controller check pending |
 | Virtual display | Create/remove display; original topology restored | Virtual-1 captured; all eight virtual outputs disabled after quitting Desktop; physical baseline verification pending |
 | Service restart | Warn viewer, restart controller, reconnect, inspect recovery | Passed: stopped test stream, restarted controller, paired client reconnected |
 | Reboot | Driver/controller recover; paired client reconnects | Passed: new boot ID, both services active, paired Mac reconnects with H.264 video and KRunner keyboard input |
@@ -135,8 +135,9 @@ Moonlight 6.2.0 was installed on the owner's Mac, paired, and completed a live
 H.264 stream from Virtual-1. Keyboard input opened Konsole and ran a test
 command; the virtual keyboard also emitted matching libinput events. Client
 logs show stereo CoreAudio output and received audio packets; a five-second
-stereo tone was played into the host's stream sink. Audible output was not
-observed. The idle-desktop stream reported approximately 19–20 FPS, with zero
+stereo tone was played into the host's stream sink. Audible output was
+subsequently confirmed by the owner, together with mouse and keyboard operation
+on the Mac. The idle-desktop stream reported approximately 19–20 FPS, with zero
 network frame drops in the observed stable statistics; this does not establish
 60 FPS performance under game load.
 
@@ -177,3 +178,17 @@ the already paired Mac opened a Desktop video stream without a new PIN.
 The DKMS log warned that Nobara lacks `/usr/sbin/weak-modules`; exact running
 kernel installation nevertheless succeeded. Future-kernel coverage remains
 dependent on the normal DKMS kernel-update path.
+
+## Remaining qualification before a pull request
+
+The owner confirmed working mouse, keyboard and audible audio on the Mac.
+Pair a Steam Deck as an additional client and test a controller-supported game,
+including sticks, buttons, triggers and rumble. A game session and physical
+controller results remain unverified. No upstream pull request has been opened.
+
+Keep the two fork branches for review: `fedora-native-build` contains build/RPM
+support; `fedora-native-install` adds native installation and runtime integration.
+Review the second branch against the first when preparing the later contribution.
+Temporary target-machine diagnostics and duplicate qualification packages are
+archived privately under `~/vibeshine-qualification-archive/`; installed settings,
+pairings and the reproducible build output remain in place.
