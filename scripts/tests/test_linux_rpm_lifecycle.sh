@@ -43,7 +43,9 @@ if systemctl is-active --quiet vibeshine-session-controller.service; then exit 1
 if systemctl is-active --quiet vibeshine.service; then exit 1; fi
 sha256sum -c /tmp/retention.sha256
 [[ ! -e /usr/bin/vibeshine && ! -e /usr/libexec/vibeshine/vibeshine-host ]]
-transaction install "$package"
+# Normal DNF removal may also erase unused runtime dependencies. Reinstall the
+# complete stored, previously verified payload without depending on networking.
+transaction install /var/tmp/vibeshine-install/packages/*.rpm
 check_private_host_security
 sha256sum -c /tmp/retention.sha256
 printf 'PASS: native RPM first install, same-version replacement, removal and reinstall preserve fixture state and privileged metadata.\n'
