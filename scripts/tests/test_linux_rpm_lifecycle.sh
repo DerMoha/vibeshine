@@ -12,7 +12,7 @@ installer=$2
 [[ -f "$package" ]] || exit 1
 transaction() {
   local operation=$1; shift
-  dnf "$operation" -y "$@" 2>&1 | tee "/tmp/vibeshine-$operation.log"
+  dnf --cacheonly "$operation" -y "$@" 2>&1 | tee "/tmp/vibeshine-$operation.log"
   if grep -Eiq 'scriptlet.*fail|%pre.*fail|%post.*fail' "/tmp/vibeshine-$operation.log"; then
     echo "RPM $operation scriptlet failed" >&2
     exit 1
