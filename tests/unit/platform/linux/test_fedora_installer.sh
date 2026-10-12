@@ -252,6 +252,8 @@ printf 'Socket lifecycle checks preserve idle/cgroup requirements without MainPI
     else printf 'RefuseManualStart=%s\nKillMode=mixed\nSendSIGKILL=no\n' "$refuse"; fi
   }
   vibeshine_unit_is_quiescent() { ((idle)); }
+  # The fence function loaded through eval reads this fixture variable.
+  # shellcheck disable=SC2034
   vibeshine_upgrade_kill_mode=mixed; idle=1; refuse=yes
   for load in not-found masked loaded; do vibeshine_activate_host_upgrade_fence; done
   load=masked; idle=0

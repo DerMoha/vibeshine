@@ -109,7 +109,7 @@ interactive tests.
 | Test | Evidence to retain | Status |
 | --- | --- | --- |
 | Exact kernel-devel and DKMS build | Installer output, DKMS status, build logs on failure | Passed: both modules installed for target kernel |
-| DRM module loads | Installed and loaded version match; no load errors | Passed: installed/loaded version 2.0.0 |
+| DRM module loads | Installed and loaded version match; no load errors | Passed: installed/loaded version 2.0.1 after reboot |
 | Service/controller session binding | System service status and relevant journal excerpt | Passed: ready desktop session 2, host active/running |
 | HTTPS Web UI | Browser reaches `https://localhost:47990` | HTTP 200 verified; interactive login pending |
 | Moonlight pairing | PIN accepted; client reconnects | Passed: Moonlight 6.2.0 on macOS, reconnect after controller restart |
@@ -117,8 +117,8 @@ interactive tests.
 | Audio and input | Audible audio; keyboard/mouse/controller in session | Keyboard passed; audio transport/CoreAudio initialized; audible and physical controller checks pending |
 | Virtual display | Create/remove display; original topology restored | Virtual-1 captured; all eight virtual outputs disabled after quitting Desktop; physical baseline verification pending |
 | Service restart | Warn viewer, restart controller, reconnect, inspect recovery | Passed: stopped test stream, restarted controller, paired client reconnected |
-| Reboot | Driver/controller recover; paired client reconnects | Pending |
-| Upgrade | Install a higher native version; configuration/pairings retained | Pending |
+| Reboot | Driver/controller recover; paired client reconnects | Passed: new boot ID, both services active, paired Mac reconnects with H.264 video and KRunner keyboard input |
+| Upgrade | Install a higher native version; configuration/pairings retained | Passed: 2.0.0 to 2.0.1; configuration and pairing files retained; paired client reconnects after reboot |
 | Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Pending |
 
 Subsequent target-machine installation found and corrected first-install and
@@ -160,3 +160,11 @@ Use a genuinely newer RPM to test upgrade; repeat the installer. Remove with
 state remains, then reinstall a trusted matching/newer RPM and reconnect the
 already paired client. Do not invoke machine-host reset or purge during this
 data-retention test. Keep backups private; they contain pairing credentials.
+
+Post-upgrade reboot qualification confirmed a new boot ID, both DKMS modules
+installed at 2.0.1, DRM loaded at 2.0.1, HTTPS 200, and working group read/write
+access on `/dev/uinput`. The previously paired Mac opened a live H.264 Desktop
+stream without pairing again; Alt+F2 opened KRunner through streamed input.
+Hosted Fedora RPM build and booted package lifecycle workflows also passed.
+The hosted lifecycle check does not substitute for native removal/reinstall
+or audible audio and physical controller testing.
