@@ -28,3 +28,8 @@ assumed. Arch/CachyOS retain their versioned compiler selection.
 The Fedora 44 workflow builds and inspects the RPM on hosted Linux. This is
 package validation, not evidence that Nobara hardware, DKMS, KDE Wayland,
 Moonlight pairing or streaming work. Those require actual machine qualification.
+
+CI builds the RPM and tests its lifecycle in the same workflow run, including
+pull requests. The booted Fedora container checks package hooks and persistent
+state retention; it has no KDE/GPU or matching kernel tree and does not qualify
+streaming. See [Nobara qualification](nobara-qualification.md) for target results.

@@ -55,56 +55,16 @@ the host/socket for the authoritative session.
 
 ## Actual-machine test record
 
-On 2026-10-12, fork revision `44723ec1` built successfully on the target
-Nobara machine with CUDA disabled and GCC 16.2.1. All 145 selected
-`fast|component` CTest cases passed, as did the build/distribution and both
-Fedora and Arch installer regression scripts. CPack produced
-`vibeshine-2.0.0~nobara.validation-1.x86_64`; the RPM inspector validated its
-306 payload entries, privileged metadata, assets, services, DKMS sources and
-lifecycle contracts. Package SHA-256:
-`fd3ba0e46b194a098c992d631b31879c88ad523b8326809e3fe0a29a89eca12d`.
-These are build/package results; installation and streaming remain separate
-qualification steps.
+Qualification on 2026-10-12 used Nobara 44, KDE Plasma 6.7.5 Wayland,
+Plasma Login Manager, kernel `7.2.9-200.nobara.fc44.x86_64`, and an AMD
+RX 6900 XT with Mesa 26.2.4. Secure Boot and SELinux were disabled on this
+machine; enforcing configurations remain unqualified.
 
-After prerequisite installation, the updated installer preflight passed over
-SSH. Both DRM and DualSense modules compiled as an unprivileged user against the target
-kernel; `modinfo` reported the exact running-kernel vermagic. This was a direct
-module build, not DKMS registration, installation or loading. BTF generation
-was skipped because the development tree did not provide `vmlinux`.
-
-Nobara's prepared development tree reports only `7.2.9` from
-`make kernelrelease`. Its `include/config/kernel.release` and generated
-`UTS_RELEASE` both contain the full target release; the installer requires both
-prepared values to match the running kernel.
-
-The owner's pre-install report on 2026-10-12 confirmed Nobara 44 with the
-target kernel, an existing build Makefile and matching recorded kernel release,
-and the installed matching `kernel-devel` package. Plasma Login Manager
-(`plasmalogin.service`) was active with a local seat0 KDE Wayland session.
-Secure Boot and SELinux were disabled. No conflicting streaming-host RPMs were
-installed. DKMS, G++, CMake and Ninja were absent. Firewalld was active;
-the VibeShine firewall service was absent before package installation.
-
-The machine exposes two AMD GPUs: Navi 21 at PCI `0000:03:00.0` and
-Raphael/Radeon 610M at `0000:13:00.0`. A subsequent SSH check identified the
-discrete GPU as an RX 6900 XT with Mesa 26.2.4. `vainfo` reported H.264
-Constrained Baseline, Main and High encoding entrypoints. FFmpeg successfully
-encoded 60 synthetic 1280x720 frames with `h264_vaapi` on that render device.
-This confirms basic hardware encoding, while VibeShine capture and streaming
-remain pending. To inspect the discrete GPU explicitly:
-
-```bash
-sudo dnf install libva-utils
-ls -l /dev/dri/by-path/
-vainfo --display drm --device /dev/dri/by-path/pci-0000:03:00.0-render
-```
-
-Retain the VAAPI profiles and entrypoints. An encoding entrypoint is a
-prerequisite; qualification still requires a real H.264 streaming session.
-
-Record the package version, running kernel, GPU/driver and results for each row.
-The statuses below distinguish observed target-machine results from remaining
-interactive tests.
+The native CUDA-free build used GCC 16.2.1. All 145 selected `fast|component`
+CTest cases and the Fedora/Arch installer regressions passed. CPack RPM
+inspection checked assets, services, privileged metadata and DKMS sources.
+Native installation and the upgrade from `2.0.0~nobara.validation` to
+`2.0.1~nobara.validation` were tested separately from the hosted build.
 
 | Test | Evidence to retain | Status |
 | --- | --- | --- |
@@ -121,74 +81,36 @@ interactive tests.
 | Upgrade | Install a higher native version; configuration/pairings retained | Passed: 2.0.0 to 2.0.1; configuration and pairing files retained; paired client reconnects after reboot |
 | Removal/reinstall | DNF removal stops services; reinstall retains state/pairings | Passed on Nobara: normal DNF removal, native installer reinstall, configuration/pairing checksums retained, paired Mac streams again |
 
-Subsequent target-machine installation found and corrected first-install and
-interrupted-install systemd hook assumptions (absent service fences, template
-queries, socket units without `MainPID`). Revision `d1d37523` was rebuilt and
-installed through DNF after recovery. Both DKMS modules report installed for
-the exact target kernel and appear in `lsmod`. The controller and host reach
-active/running, and the local HTTPS UI returns 200. The host discovers
-`h264_vaapi` and `hevc_vaapi`; AV1 encoding is unavailable on this GPU.
-The same 145 CTest cases passed after the KMS routing fix. Privileged ownership,
-mode, link count and file capabilities were checked on the installed payload;
-the active firewalld zone allows the packaged service after definition reload.
-Moonlight 6.2.0 was installed on the owner's Mac, paired, and completed a live
-H.264 stream from Virtual-1. Keyboard input opened Konsole and ran a test
-command; the virtual keyboard also emitted matching libinput events. Client
-logs show stereo CoreAudio output and received audio packets; a five-second
-stereo tone was played into the host's stream sink. Audible output was
-subsequently confirmed by the owner, together with mouse and keyboard operation
-on the Mac. The idle-desktop stream reported approximately 19–20 FPS, with zero
-network frame drops in the observed stable statistics; this does not establish
-60 FPS performance under game load.
 
-Input testing found that uinput was not loaded and a pre-existing uaccess ACL
-retained `group::---` after udev assigned the dedicated group. Loading uinput
-and restoring only that group's `rw` ACL allowed the host to create its virtual
-keyboard and mouse. The package now loads uinput at install/boot, preserves
-existing user ACLs during recovery, and the DNF installer verifies that the
-service identity with its dedicated input group can actually open `/dev/uinput`.
+Configuration, apps, machine profile and pairing state matched saved SHA-256
+checksums after native removal and reinstall. Moonlight 6.2 on macOS reconnected
+without a new PIN. The owner confirmed mouse, keyboard and audible audio.
+The observed idle desktop ran around 19–20 FPS; this does not establish 60 FPS
+performance under game load. Steam Deck controller/game testing remains pending.
 
-For logs, use `sudo journalctl -u vibeshine-session-controller.service
--u vibeshine.service -b --no-pager`. Review logs before sharing. A reachable Web
-UI or active system unit alone does not prove encoder, audio, input or display
-readiness. NVIDIA greeter streaming additionally needs a logout/login test;
-non-NVIDIA pre-login streaming is not currently supported.
+Nobara's `make kernelrelease` reports only `7.2.9`; its prepared
+`include/config/kernel.release` and `include/generated/utsrelease.h` report the
+full release. Both prepared values must match the running kernel. DKMS warned
+that `/usr/sbin/weak-modules` was absent, but exact running-kernel installation
+succeeded. Future-kernel updates still require qualification.
 
-For lifecycle testing, take a root-readable backup of `/etc/vibeshine` and
-`/var/lib/vibeshine` while the service is stopped, after warning the viewer.
-Use a genuinely newer RPM to test upgrade; repeat the installer. Remove with
-`sudo dnf remove vibeshine`, verify the controller is stopped and persistent
-state remains, then reinstall a trusted matching/newer RPM and reconnect the
-already paired client. Do not invoke machine-host reset or purge during this
-data-retention test. Keep backups private; they contain pairing credentials.
+## Repeating runtime and lifecycle checks
 
-Post-upgrade reboot qualification confirmed a new boot ID, both DKMS modules
-installed at 2.0.1, DRM loaded at 2.0.1, HTTPS 200, and working group read/write
-access on `/dev/uinput`. The previously paired Mac opened a live H.264 Desktop
-stream without pairing again; Alt+F2 opened KRunner through streamed input.
-Hosted Fedora RPM build and booted package lifecycle workflows also passed.
-The hosted lifecycle check does not substitute for native removal/reinstall
-or audible audio and physical controller testing.
+Inspect the discrete GPU with `vainfo --display drm --device
+/dev/dri/by-path/pci-0000:03:00.0-render` (from `libva-utils`). VAAPI encoding
+entrypoints alone do not prove a working stream. Inspect services with
+`sudo journalctl -u vibeshine-session-controller.service -u vibeshine.service
+-b --no-pager`; review logs before sharing.
 
-Native removal/reinstall also passed on the target. DNF removed only Vibeshine;
-configuration, apps, machine profile and pairing state matched saved SHA-256
-checksums both after removal and after reinstall. Both DKMS modules were
-installed again, the controller recovered the host, HTTPS returned 200 and
-the already paired Mac opened a Desktop video stream without a new PIN.
-The DKMS log warned that Nobara lacks `/usr/sbin/weak-modules`; exact running
-kernel installation nevertheless succeeded. Future-kernel coverage remains
-dependent on the normal DKMS kernel-update path.
+Before lifecycle tests, warn the viewer, stop the services, and take a private
+root-readable backup of `/etc/vibeshine` and `/var/lib/vibeshine`. These contain
+credentials and pairings. Test a genuinely higher RPM version, reboot and
+reconnect the paired client. Then use normal `dnf remove vibeshine`, verify
+services stopped and state remains, reinstall a trusted RPM and reconnect.
+Do not invoke reset or purge during retention testing.
 
-## Remaining qualification before a pull request
-
-The owner confirmed working mouse, keyboard and audible audio on the Mac.
-Pair a Steam Deck as an additional client and test a controller-supported game,
-including sticks, buttons, triggers and rumble. A game session and physical
-controller results remain unverified. No upstream pull request has been opened.
-
-Keep the two fork branches for review: `fedora-native-build` contains build/RPM
-support; `fedora-native-install` adds native installation and runtime integration.
-Review the second branch against the first when preparing the later contribution.
-Temporary target-machine diagnostics and duplicate qualification packages are
-archived privately under `~/vibeshine-qualification-archive/`; installed settings,
-pairings and the reproducible build output remain in place.
+For controller qualification, pair a Steam Deck as an additional client and
+test sticks, buttons, triggers and rumble in a controller-supported game.
+Check physical output topology before/after streaming. Non-NVIDIA pre-login
+streaming is not supported; this AMD desktop test does not qualify greeter
+streaming or NVIDIA hardware.
