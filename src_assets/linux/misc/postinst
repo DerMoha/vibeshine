@@ -3,7 +3,7 @@
 # Load uhid (DS5 emulation)
 echo "Loading uhid kernel module for DS5 emulation."
 modprobe uhid
-modprobe uinput || exit 1
+modprobe uinput || echo 'warning: could not load uinput; native installer must verify input access before completion.' >&2
 
 # Portable/user-scoped installs still need a file capability for KMS. Native
 # machine-service packages set VIBESHINE_EXECUTABLE_CAPABILITY_MODE=unit and
@@ -50,6 +50,18 @@ if [ -x "$path_to_udevadm" ] ; then
   $path_to_udevadm trigger --property-match=DEVNAME=/dev/uinput
   $path_to_udevadm trigger --property-match=DEVNAME=/dev/uhid
   $path_to_udevadm settle --timeout=10 || exit 1
+  if [ "${VIBESHINE_EXECUTABLE_CAPABILITY_MODE:-file}" = unit ]; then
+    for device in /dev/uinput /dev/uhid; do
+      [ -c "$device" ] || continue
+      [ ! -L "$device" ] && [ "$(stat -c '%u:%G' "$device")" = '0:vibeshine-uinput' ] || {
+        echo "error: unsafe native input device ownership: $device" >&2
+        exit 1
+      }
+      # A pre-existing uaccess ACL can retain group::--- despite mode 0660.
+      # Restore only the dedicated owning group's access; preserve user ACLs.
+      setfacl -m g::rw "$device" || exit 1
+    done
+  fi
   echo "Udev rules reloaded successfully."
 else
   echo "error: udevadm not found or not executable."

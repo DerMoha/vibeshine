@@ -908,6 +908,13 @@ check_dkms_state() {
   ok "DKMS virtual-display installation verified for $kernel_release."
 }
 
+check_native_input_access() {
+  setpriv --reuid=vibeshine --regid=vibeshine --groups=vibeshine-uinput --no-new-privs \
+    python3 -c 'import os; fd = os.open("/dev/uinput", os.O_RDWR | os.O_CLOEXEC); os.close(fd)' ||
+    die 'The service account cannot open /dev/uinput. Verify uinput is loaded, the packaged udev rule is applied, and the dedicated group ACL has rw access; input is not ready.'
+  ok 'Dedicated service group can open the virtual-input device.'
+}
+
 main() {
   parse_args "$@"
   require_root
@@ -930,6 +937,7 @@ main() {
   install_dualsense_driver
   if [[ "$package_manager" == dnf ]]; then check_dkms_state; fi
   repair_machine_setup || die 'machine setup recovery failed; installation is not complete'
+  if [[ "$package_manager" == dnf ]]; then check_native_input_access; fi
   open_firewall
   check_driver_state
   check_services

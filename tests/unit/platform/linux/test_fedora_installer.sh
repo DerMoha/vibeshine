@@ -268,3 +268,13 @@ printf 'First-install and interrupted-install fences retain idle and upgrade gua
   [[ $(< "$firewall_trace") == $'--reload\n--permanent --add-service=vibeshine\n--reload' ]]
 )
 printf 'Firewalld loads the packaged service definition before enabling it.\n'
+(
+  setpriv() {
+    [[ "$*" == '--reuid=vibeshine --regid=vibeshine --groups=vibeshine-uinput --no-new-privs python3 -c '* ]] || return 2
+    return "$input_result"
+  }
+  input_result=0; check_native_input_access
+  input_result=1
+  if (check_native_input_access); then exit 1; fi
+)
+printf 'Input-access failure blocks completed installation.\n'
