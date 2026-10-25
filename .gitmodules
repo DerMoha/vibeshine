@@ -86,7 +86,7 @@
 	url = https://chromium.googlesource.com/chromium/tools/depot_tools.git
 [submodule "third-party/libvirtualdisplay"]
 	path = third-party/libvirtualdisplay
-	url = https://github.com/Nonary/libvirtualdisplay.git
+	url = https://github.com/DerMoha/libvirtualdisplay.git
 	branch = master
 [submodule "third-party/libvirtualgamepad"]
 	path = third-party/libvirtualgamepad

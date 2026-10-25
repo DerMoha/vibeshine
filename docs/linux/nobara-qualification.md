@@ -114,3 +114,16 @@ test sticks, buttons, triggers and rumble in a controller-supported game.
 Check physical output topology before/after streaming. Non-NVIDIA pre-login
 streaming is not supported; this AMD desktop test does not qualify greeter
 streaming or NVIDIA hardware.
+
+## Native Mac resolution regression (2026-10-25)
+
+On kernel 7.2.11 with Mesa 26.2.5, the virtual driver's native shmem scanout
+at 3024×1964 failed AMD EGL DMA-BUF import with `EGL_BAD_ALLOC` (0x3003).
+An independent probe reproduced failure at pitch 12096 and success with the
+same visible dimensions at pitch 12288. 1920×1080 imported successfully.
+The driver fix aligns native allocations to a 256-byte pitch while preserving
+visible dimensions and leaving imported GPU buffers unchanged. Callback tests
+cover multiple widths/depths, overflow and allocator failure. Driver builds
+passed against target kernels 7.2.9 and 7.2.11; live validation of the updated
+module is pending a full power-off/power-on cycle. This host cannot reliably
+warm reboot (owner reports a DRAM diagnostic LED); do not use `reboot`.
