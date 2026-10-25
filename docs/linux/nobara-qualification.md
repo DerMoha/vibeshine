@@ -124,6 +124,13 @@ same visible dimensions at pitch 12288. 1920×1080 imported successfully.
 The driver fix aligns native allocations to a 256-byte pitch while preserving
 visible dimensions and leaving imported GPU buffers unchanged. Callback tests
 cover multiple widths/depths, overflow and allocator failure. Driver builds
-passed against target kernels 7.2.9 and 7.2.11; live validation of the updated
-module is pending a full power-off/power-on cycle. This host cannot reliably
+passed against target kernels 7.2.9 and 7.2.11. Native RPM
+`2.0.2~nobara.pitchfix-1` was installed and its module loaded after power-off
+and Wake-on-LAN. The independent probe then confirmed native pitch 12288 and
+successful EGL import. Moonlight displayed 3024×1964 through initial launch,
+disconnect/resume and Quit app/fresh launch. DP-3 was enabled after Quit app.
+A moving native-resolution test pattern reached approximately 60 FPS, with
+zero observed network drops. No RGB import/conversion errors or service
+restarts appeared in the new boot journal. These are short targeted regression
+tests, not an extended gaming soak test. This host cannot reliably
 warm reboot (owner reports a DRAM diagnostic LED); do not use `reboot`.
