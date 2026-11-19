@@ -35,6 +35,7 @@ extern "C" {
 }
 
 // local includes
+#include "ambient_light.h"
 #include "cbs.h"
 #include "capture_recovery.h"
 #include "config.h"
@@ -3045,6 +3046,21 @@ namespace video {
     }
   }
 
+  std::unique_ptr<ambient_light::capture_tap_t> make_ambient_light_tap() {
+    if (!config::ambient_light.enabled || config::ambient_light.host.empty()) {
+      return nullptr;
+    }
+
+    const auto &settings = config::ambient_light;
+    return std::make_unique<ambient_light::capture_tap_t>(
+      ambient_light::settings_t {settings.host, settings.port, settings.priority, settings.fps},
+      ambient_light::make_platform_reader,
+      [](std::string_view message) {
+        BOOST_LOG(info) << "Ambient light: "sv << message;
+      }
+    );
+  }
+
   void captureThread(
     std::shared_ptr<safe::queue_t<capture_ctx_t>> capture_ctx_queue,
     sync_util::sync_t<std::weak_ptr<platf::display_t>> &display_wp,
@@ -3323,9 +3339,16 @@ namespace video {
     platf::set_thread_name("video::capture");
     platf::adjust_thread_priority(platf::thread_priority_e::critical);
 
+    // Secondary monitors keep their own capture thread and must not fight for the LEDs.
+    const auto ambient_light_tap = !capture_ctxs.empty() && capture_ctxs.front().config.capture_source == capture_source_e::active_output ?
+                                     make_ambient_light_tap() :
+                                     nullptr;
+
     while (capture_ctx_queue->running()) {
       bool artificial_reinit = false;
       const bool event_driven_capture = disp->is_event_driven_capture();
+      // HDR changes reinitialize capture, and the query is too slow for every frame.
+      const bool ambient_light_hdr = ambient_light_tap && disp->is_hdr();
 
       auto push_captured_image_callback = [&](std::shared_ptr<platf::img_t> &&img, bool frame_captured) -> bool {
 #ifdef _WIN32
@@ -3361,6 +3384,10 @@ namespace video {
 
           ++capture_ctx;
         })
+
+        if (frame_captured && ambient_light_tap) {
+          ambient_light_tap->offer(img, disp->width, disp->height, ambient_light_hdr);
+        }
 
         if (!capture_ctx_queue->running()) {
           return false;
@@ -5962,6 +5989,8 @@ namespace video {
     }
 
     const auto bootstrap_image = img;
+    const auto ambient_light_tap = make_ambient_light_tap();
+    const bool ambient_light_hdr = ambient_light_tap && disp->is_hdr();
     auto ec = platf::capture_e::ok;
     while (encode_session_ctx_queue.running()) {
       auto push_captured_image_callback = [&](std::shared_ptr<platf::img_t> &&img, bool frame_captured) -> bool {
@@ -5974,6 +6003,10 @@ namespace video {
           BOOST_LOG(error) << "Capture backend reported a frame without an image"sv;
           ec = platf::capture_e::error;
           return false;
+        }
+
+        if (frame_captured && ambient_light_tap) {
+          ambient_light_tap->offer(img, disp->width, disp->height, ambient_light_hdr);
         }
 
         if (!frame_captured && !img) img = bootstrap_image;

@@ -67,6 +67,16 @@ function removeCmd(index: number) {
       <ConfigFieldRenderer v-model="config.app_focus_exit_on_first" setting-key="app_focus_exit_on_first" />
     </section>
 
+    <section v-if="platform === 'linux'" class="mb-6 space-y-4" aria-labelledby="ambient-light-heading">
+      <h3 id="ambient-light-heading" class="text-lg font-semibold">{{ $t('config.ambient_light_title') }}</h3>
+      <p class="text-sm opacity-70">{{ $t('config.ambient_light_description') }}</p>
+      <ConfigFieldRenderer v-model="config.ambient_light_enabled" setting-key="ambient_light_enabled" />
+      <ConfigFieldRenderer v-model="config.ambient_light_host" setting-key="ambient_light_host" />
+      <ConfigFieldRenderer v-model="config.ambient_light_port" setting-key="ambient_light_port" />
+      <ConfigFieldRenderer v-model="config.ambient_light_priority" setting-key="ambient_light_priority" />
+      <ConfigFieldRenderer v-model="config.ambient_light_fps" setting-key="ambient_light_fps" />
+    </section>
+
     <div id="global_prep_cmd" class="mb-6 flex flex-col">
       <label class="block text-sm font-medium mb-1 text-dark dark:text-light">
         {{ $t('config.global_prep_cmd') }}

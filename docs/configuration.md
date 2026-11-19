@@ -5372,6 +5372,38 @@ Lets GPU encoders read each Windows Graphics Capture frame directly from the cap
   [TOC]
 </details>
 
+## Ambient light
+
+Sends a 64x36 RGB copy of the active stream to a HyperHDR or Hyperion.ng
+FlatBuffers server while a session is running, so LEDs follow streamed content
+on virtual displays. Implemented for Linux capture; other platforms ignore these
+settings. HDR frames are tone mapped to SDR before sending. Memory capture only
+supports 8-bit BGRX frames; other memory formats send nothing.
+
+### ambient_light_enabled
+
+Sends ambient light while streaming. Default: `true`. This key can be set as a
+per-client override in Devices, so you can turn it off for a headset or turn it
+on only for the client in front of the TV. When several clients stream at once,
+the first client's setting applies.
+
+### ambient_light_host
+
+Host name or address of the server. Default: empty, which disables the feature.
+
+### ambient_light_port
+
+FlatBuffers server port, from 1 to 65535. Default: `19400`.
+
+### ambient_light_priority
+
+Source priority on the server, from 100 to 199. Lower values win. Default:
+`150`.
+
+### ambient_light_fps
+
+Maximum frames sent per second, from 1 to 60. Default: `30`.
+
 ## Managed application focus
 
 Focus policy is shared by managed Steam, Lutris and Playnite launches. Windows

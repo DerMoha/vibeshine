@@ -1061,6 +1061,8 @@ namespace config {
     false  // allow_virtual_display_override
   };
 
+  ambient_light_t ambient_light {};
+
   lossless_scaling_t lossless_scaling {
     {},  // exe_path
     false  // legacy_auto_detect
@@ -2036,6 +2038,13 @@ namespace config {
         }
       }
     }
+    bool_f(vars, "ambient_light_enabled", ambient_light.enabled);
+    string_f(vars, "ambient_light_host", ambient_light.host);
+    int_between_f(vars, "ambient_light_port", ambient_light.port, {1, 65535});
+    // Range accepted by both HyperHDR (50-250) and Hyperion.ng (100-199).
+    int_between_f(vars, "ambient_light_priority", ambient_light.priority, {100, 199});
+    int_between_f(vars, "ambient_light_fps", ambient_light.fps, {1, 60});
+
     string_f(vars, "rtss_install_path", rtss.install_path);
     string_f(vars, "rtss_frame_limit_type", rtss.frame_limit_type);
     bool_f(vars, "rtss_allow_virtual_display_override", rtss.allow_virtual_display_override);
@@ -2696,6 +2705,7 @@ namespace config {
         "dd_wa_dummy_plug_hdr10",
         "max_bitrate",
         "minimum_fps_target",
+        "ambient_light_enabled",
 
         // Codec / capture negotiation
         "fec_percentage",

@@ -805,6 +805,11 @@ sunshine_register_component(NAME test_component_session_history TEST_SOURCE unit
 sunshine_register_component(NAME test_component_hardware_metrics TEST_SOURCE unit/test_hardware_metrics.cpp
     PRODUCT_SOURCES "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/hardware_metrics.cpp"
     LINK_LIBRARIES nlohmann_json::nlohmann_json)
+sunshine_register_component(NAME test_component_ambient_light TEST_SOURCE unit/test_ambient_light.cpp
+    PRODUCT_SOURCES
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/ambient_light.cpp"
+        "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/ambient_light_protocol.cpp"
+    LINK_LIBRARIES Boost::asio Boost::system ${SUNSHINE_TEST_SOCKET_LIBRARIES})
 sunshine_register_component(NAME test_component_host_stats TEST_SOURCE unit/test_host_stats.cpp
     PRODUCT_SOURCES "${SUNSHINE_TEST_REPOSITORY_ROOT}/src/host_stats_service.cpp")
 sunshine_register_component(NAME test_component_audio_policy TEST_SOURCE unit/test_audio.cpp

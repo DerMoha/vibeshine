@@ -47,6 +47,9 @@ const SWITCH_KEYS = new Set<string>([
 ]);
 
 const NUMBER_FIELD_OVERRIDES: Record<string, Partial<ConfigFieldDefinition>> = {
+  ambient_light_port: { min: 1, max: 65535, step: 1, precision: 0 },
+  ambient_light_priority: { min: 100, max: 199, step: 1, precision: 0 },
+  ambient_light_fps: { min: 1, max: 60, step: 1, precision: 0 },
   app_focus_attempts: { min: 0, max: 100, step: 1, precision: 0 },
   app_focus_timeout_secs: { min: 0, max: 300, step: 1, precision: 0 },
   fec_percentage: { placeholder: '20' },

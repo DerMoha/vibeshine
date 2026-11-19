@@ -1839,6 +1839,10 @@
         "saved_ready": "Saved installation ready"
       },
       "groups": {
+        "ambient_light": {
+          "title": "Ambient light",
+          "description": "Send a small copy of the active stream to HyperHDR or Hyperion.ng while a session runs."
+        },
         "app_focus": {
           "title": "Managed application focus",
           "description": "Automatically bring games from managed libraries to the foreground after launch."

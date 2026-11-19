@@ -385,6 +385,7 @@ namespace pipewire {
         } else {
           auto *owned_image = static_cast<image_t *>(img);
           owned_image->pixels.swap(*stream_data.front_buffer);
+          img_descriptor->sd.fourcc = stream_data.drm_format;
           img->data = owned_image->pixels.data();
           img->row_pitch = stream_data.local_stride;
         }

@@ -222,6 +222,11 @@ const defaultGroups = [
       playnite_autosync_delete_after_days: 0,
       playnite_autosync_require_replacement: true,
       playnite_autosync_remove_uninstalled: true,
+      ambient_light_enabled: true,
+      ambient_light_host: '',
+      ambient_light_port: 19400,
+      ambient_light_priority: 150,
+      ambient_light_fps: 30,
       app_focus_attempts: 3,
       app_focus_timeout_secs: 15,
       app_focus_exit_on_first: false,
@@ -645,6 +650,7 @@ export const useConfigStore = defineStore('config', () => {
       'playnite_autosync_require_replacement',
       'playnite_autosync_remove_uninstalled',
       'app_focus_exit_on_first',
+      'ambient_light_enabled',
       'playnite_fullscreen_entry_enabled',
     ];
     // Extend boolean normalization to cover RTSS enable flag

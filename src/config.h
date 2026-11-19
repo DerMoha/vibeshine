@@ -401,6 +401,15 @@ namespace config {
     }
   };
 
+  // HyperHDR/Hyperion.ng image server. An empty host disables the integration.
+  struct ambient_light_t {
+    bool enabled {true};  // Per-client override picks which clients drive the LEDs.
+    std::string host;
+    int port {19400};
+    int priority {150};
+    int fps {30};
+  };
+
   // Windows-only: RTSS integration settings
   struct rtss_t {
     // RTSS install path. If empty, defaults to "%PROGRAMFILES%/RivaTuner Statistics Server"
@@ -498,6 +507,7 @@ namespace config {
   extern input_t input;
   extern frame_limiter_t frame_limiter;
   extern rtss_t rtss;
+  extern ambient_light_t ambient_light;
   extern lossless_scaling_t lossless_scaling;
   extern sunshine_t sunshine;
 

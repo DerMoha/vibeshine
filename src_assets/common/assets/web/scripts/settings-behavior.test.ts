@@ -172,6 +172,19 @@ test('managed application focus settings are shared across platforms and separat
   }
 });
 
+test('ambient light settings are Linux host options with host-matching limits', async () => {
+  const { settingsCategories, settingsDefaults, clientOverrideableKeys } = await import('../configs/settingsSchema.ts');
+  const group = settingsCategories.flatMap((category) => category.groups).find((entry) => entry.id === 'ambient_light');
+  assert.equal(group?.platform, 'linux');
+  assert.deepEqual(group?.fields.map((field) => field.key), [
+    'ambient_light_enabled', 'ambient_light_host', 'ambient_light_port', 'ambient_light_priority', 'ambient_light_fps',
+  ]);
+  assert.equal(settingsDefaults.ambient_light_host, '');
+  assert.equal(settingsDefaults.ambient_light_priority, 150);
+  assert.equal(settingsDefaults.ambient_light_enabled, true);
+  assert.ok(clientOverrideableKeys.has('ambient_light_enabled'));
+});
+
 test('virtual display capacity allows six and stays a bounded global setting', async () => {
   const { settingsDefaults, clientOverrideableKeys } = await import('../configs/settingsSchema.ts');
   const field = settingsFields.get('virtual_display_max_clients');
