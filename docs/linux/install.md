@@ -437,7 +437,25 @@ bash scripts/linux_build.sh --skip-cuda
 sudo bash scripts/linux_install.sh --package /absolute/path/vibeshine.rpm
 ```
 
-Use a trusted locally built RPM. There is no configured Fedora release
+For an RPM downloaded from GitHub Actions, verify the exact file before
+running the installer. Successful push builds publish signed SHA-256 digests
+after the Fedora lifecycle tests. Set the expected repository and branch to
+the publisher you trust. For this fork:
+
+```bash
+rpm=/absolute/path/vibeshine.rpm
+repo=DerMoha/vibeshine
+gh attestation verify "$rpm" --repo "$repo" \
+  --signer-workflow "$repo/.github/workflows/validate-fedora.yml" \
+  --source-ref refs/heads/fedora-nobara-clean --deny-self-hosted-runners &&
+  sudo bash scripts/linux_install.sh --package "$rpm"
+```
+
+The verifier hashes the RPM itself. The workflow also publishes a signed
+`SHA256SUMS` file in the `fedora44-rpm-checksums` artifact for the same run.
+Locally built RPMs use the local build instructions above.
+
+There is no configured Fedora release
 repository; the installer requires an explicit package. DNF resolves dependencies
 and upgrades without automatic conflict erasure or a full distribution upgrade.
 Sunshine/Apollo conflicts and unowned manual installation files require explicit administrator resolution and a backup

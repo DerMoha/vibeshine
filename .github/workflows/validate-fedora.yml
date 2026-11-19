@@ -75,3 +75,30 @@ jobs:
     permissions:
       contents: read
       actions: read
+  attest:
+    needs: lifecycle
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: fedora44-rpm
+          path: packages
+      - name: Generate RPM checksums
+        working-directory: packages
+        run: sha256sum -- *.rpm > SHA256SUMS
+      - name: Sign the RPM digests and checksum file
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            packages/*.rpm
+            packages/SHA256SUMS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fedora44-rpm-checksums
+          path: packages/SHA256SUMS
+          if-no-files-found: error
