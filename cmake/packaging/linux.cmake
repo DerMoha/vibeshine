@@ -343,6 +343,11 @@ endif()
 
 # RPM specific
 set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
+set(CPACK_RPM_COMPONENT_INSTALL OFF)
+set(CPACK_RPM_PACKAGE_NAME "vibeshine")
+set(CPACK_RPM_PACKAGE_CONFLICTS "sunshine, apollo, vibepollo")
+# The service group must exist before RPM unpacks root:vibeshine files.
+set(CPACK_RPM_PACKAGE_REQUIRES_PRE "/usr/bin/systemd-sysusers")
 
 # FreeBSD specific
 set(CPACK_FREEBSD_PACKAGE_MAINTAINER "${CPACK_PACKAGE_VENDOR}")
@@ -354,7 +359,7 @@ set(CPACK_FREEBSD_PACKAGE_LICENSE "GPLv3")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
             "${CMAKE_CURRENT_BINARY_DIR}/preinst;${CMAKE_CURRENT_BINARY_DIR}/postinst;${CMAKE_CURRENT_BINARY_DIR}/prerm;${CMAKE_CURRENT_BINARY_DIR}/postrm")
-    set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/preinst")
+    set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/rpm-preinst")
     set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/postinst")
     set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/prerm")
     set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_BINARY_DIR}/postrm")
@@ -411,6 +416,7 @@ endif()
 # drivers, and assets together.
 set(CPACK_DEB_COMPONENT_INSTALL OFF)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
+            acl, \
             ${CPACK_DEB_PLATFORM_PACKAGE_DEPENDS} \
             debianutils, \
             libcap2, \
@@ -441,6 +447,7 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             x11-utils")
 set(CPACK_RPM_PACKAGE_REQUIRES "\
             ${CPACK_RPM_PLATFORM_PACKAGE_REQUIRES} \
+            /usr/bin/setfacl, \
             /usr/bin/pactl, \
             /usr/bin/parec, \
             /usr/bin/python3, \
@@ -532,7 +539,7 @@ if(${SUNSHINE_TRAY} STREQUAL 1)
                     libnotify4")
     set(CPACK_RPM_PACKAGE_REQUIRES "\
                     ${CPACK_RPM_PACKAGE_REQUIRES}, \
-                    libappindicator-gtk3 >= 12.10.0")
+                    (libayatana-appindicator-gtk3 or libappindicator-gtk3 >= 12.10.0)")
     list(APPEND CPACK_FREEBSD_PACKAGE_DEPS
             devel/libayatana-appindicator
             devel/libnotify

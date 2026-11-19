@@ -1,0 +1,65 @@
+name: Validate Fedora RPM lifecycle
+on:
+  workflow_call:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fedora-lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      # Called after the RPM job: download only this run's artifact.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: fedora44-rpm
+          path: packages
+      - name: Prepare disposable Fedora root
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y systemd-container
+          # Resolve/download all signed repository dependencies in Docker's
+          # working network before testing hooks in the booted nspawn root.
+          docker run --name vibeshine-fedora-root --volume="$PWD/packages:/packages:ro" fedora:44 \
+            bash -c 'dnf install -y systemd systemd-udev dbus-daemon procps-ng && systemctl enable dbus.socket && dnf install --store=/var/tmp/vibeshine-install -y /packages/*.rpm && mkdir -p /var/tmp/vibeshine-install/packages && cp --remove-destination /packages/*.rpm /var/tmp/vibeshine-install/packages/'
+          mkdir rootfs
+          docker export vibeshine-fedora-root | sudo tar -xpf - -C rootfs
+          docker rm vibeshine-fedora-root
+          # Avoid first-boot presets undoing the explicitly enabled test bus.
+          systemd-id128 new | sudo tee rootfs/etc/machine-id >/dev/null
+          cp scripts/tests/test_linux_rpm_lifecycle.sh scripts/linux_install.sh packages/
+      - name: Test real package hooks under systemd
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo systemd-nspawn --boot --directory="$PWD/rootfs" \
+            --machine=vibeshine-rpm-test --resolv-conf=bind-host --bind-ro="$PWD/packages:/packages" \
+            > nspawn.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if sudo systemd-run --machine=vibeshine-rpm-test --wait --pipe /usr/bin/true; then break; fi
+            sleep 1
+          done
+          rpm=$(find packages -maxdepth 1 -name '*.rpm' -printf '%f\n')
+          [[ -n "$rpm" && "$rpm" != *$'\n'* ]]
+          sudo systemd-run --machine=vibeshine-rpm-test --wait --pipe --collect \
+            /usr/bin/bash /packages/test_linux_rpm_lifecycle.sh \
+            "/packages/$rpm" /packages/linux_install.sh
+      - name: Capture container journal
+        if: always()
+        run: |
+          sudo journalctl --directory=rootfs/var/log/journal --no-pager > container-journal.log || true
+          sudo machinectl terminate vibeshine-rpm-test || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: fedora-lifecycle-logs
+          path: |
+            nspawn.log
+            container-journal.log
+          if-no-files-found: warn

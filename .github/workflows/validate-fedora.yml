@@ -1,0 +1,77 @@
+name: Validate Fedora RPM
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, main, fedora-nobara-clean]
+  pull_request:
+concurrency:
+  group: fedora-rpm-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  installer-regression:
+    runs-on: ubuntu-24.04
+    container: fedora:44
+    timeout-minutes: 10
+    steps:
+      - name: Bootstrap
+        run: dnf install -y git python3 make findutils diffutils
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - name: Installer and machine lifecycle regressions
+        run: |
+          bash tests/unit/platform/linux/test_fedora_installer.sh
+          bash tests/unit/platform/linux/test_linux_installer.sh
+          python3 tests/unit/platform/linux/test_machine_service_contract.py "$PWD"
+          python3 tests/unit/platform/linux/test_profile_upgrade.py "$PWD"
+  rpm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container: fedora:44
+    steps:
+      - name: Bootstrap
+        run: dnf install -y git nodejs npm findutils which make python3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          submodules: false
+          fetch-depth: 0
+      - name: Initialize Linux dependencies
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git -c safe.directory="$GITHUB_WORKSPACE" submodule update --init --recursive --depth 1 -- \
+            third-party/build-deps third-party/Simple-Web-Server third-party/moonlight-common-c \
+            third-party/libdisplaydevice third-party/libvirtualdisplay-linux third-party/libvirtualgamepad \
+            third-party/googletest third-party/glad third-party/inputtino third-party/nanors \
+            third-party/nv-codec-headers third-party/plasma-wayland-protocols \
+            third-party/wayland-protocols third-party/wlr-protocols third-party/tray
+      - name: Detect actual build budget
+        run: python3 scripts/linux-build-budget.py
+      - name: Build regression
+        run: python3 tests/unit/test_linux_build_distribution.py
+      - name: Build native RPM without CUDA
+        env:
+          BUILD_VERSION: 2.0.0-fedora.validation
+        run: bash scripts/linux_build.sh --sudo-off --skip-cuda
+      - name: Linux regression tests
+        run: |
+          dnf install -y openssl dbus-daemon
+          python3 tests/unit/test_linux_build_distribution.py
+          # Permission tests require a normal user, as on the supported desktop.
+          useradd --create-home vibeshine-test
+          chown -R vibeshine-test:vibeshine-test "$GITHUB_WORKSPACE"
+          runuser -u vibeshine-test -- ctest --test-dir build --output-on-failure -L 'fast|component' --timeout 60 -j 2
+      - name: Inspect package
+        run: python3 scripts/validate-linux-rpm.py build/cpack_artifacts/*.rpm
+      - name: Resolve RPM runtime dependencies without installation
+        run: dnf install -y --downloadonly build/cpack_artifacts/*.rpm
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fedora44-rpm
+          path: 'build/cpack_artifacts/*.rpm'
+          if-no-files-found: error
+  lifecycle:
+    needs: rpm
+    uses: ./.github/workflows/validate-fedora-lifecycle.yml
+    permissions:
+      contents: read
+      actions: read

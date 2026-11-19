@@ -1,0 +1,9 @@
+#!/bin/sh
+# RPM assigns payload ownership before %post. Create the service account from
+# the same policy shipped in /usr/lib/sysusers.d before unpacking private files.
+# Do not grant privileges or add interactive users to the service group.
+/usr/bin/systemd-sysusers - <<'VIBESHINE_SYSUSERS_EOF' || exit 1
+@VIBESHINE_RPM_SYSUSERS@
+VIBESHINE_SYSUSERS_EOF
+
+@VIBESHINE_RPM_BASE_PREINST@
